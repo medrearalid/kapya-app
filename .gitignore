@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build and coverage output
+frontend/dist/
+backend/dist/
+coverage/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Extra
+AGENTS.md
