@@ -1,6 +1,8 @@
 import { GoogleGenAI } from '@google/genai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const RECEIPT_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash'
 
 const recipeResponseJsonSchema = {
   type: 'object',
@@ -150,4 +152,100 @@ export const generateWasteSaverRecipes = async ({
   }
 
   return parsedResponse
+}
+
+const parseReceiptJsonResponse = (rawText) => {
+  const parsed = parseJsonResponse(rawText)
+  if (!Array.isArray(parsed)) {
+    throw new TypeError('Fis analizi sonucu gecerli bir JSON dizisi degil.')
+  }
+
+  const normalizedItems = parsed
+    .map((item) => ({
+      name: String(item?.name ?? item?.isim ?? '').trim(),
+      quantity: Number(item?.quantity ?? item?.miktar ?? 0),
+      unit: String(item?.unit ?? item?.birim ?? '').trim(),
+      estimatedShelfLifeDays: Number(
+        item?.estimatedShelfLifeDays ?? item?.tahminiRafOmruGun ?? 0,
+      ),
+    }))
+    .filter(
+      (item) =>
+        item.name &&
+        item.unit &&
+        Number.isFinite(item.quantity) &&
+        item.quantity > 0 &&
+        Number.isFinite(item.estimatedShelfLifeDays) &&
+        item.estimatedShelfLifeDays > 0,
+    )
+
+  if (normalizedItems.length === 0) {
+    throw new Error('Fis uzerinden gecerli gida urunu cikartilamadi.')
+  }
+
+  return normalizedItems
+}
+
+const parseDataUrl = (imageBase64) => {
+  const rawInput = String(imageBase64 ?? '').trim()
+  if (!rawInput) {
+    throw new Error('Gecerli bir fis gorseli gonderilmedi.')
+  }
+
+  const dataUrlRegex = /^data:(.+);base64,(.+)$/
+  const dataUrlMatch = dataUrlRegex.exec(rawInput)
+  if (dataUrlMatch) {
+    return {
+      mimeType: dataUrlMatch[1],
+      base64Data: dataUrlMatch[2],
+    }
+  }
+
+  return {
+    mimeType: 'image/jpeg',
+    base64Data: rawInput,
+  }
+}
+
+export const analyzeReceiptImage = async ({ imageBase64 }) => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+  if (!apiKey) {
+    const missingKeyError = new Error('Sunucuda GEMINI_API_KEY tanimli degil.')
+    missingKeyError.statusCode = 500
+    throw missingKeyError
+  }
+
+  const { mimeType, base64Data } = parseDataUrl(imageBase64)
+  const prompt = [
+    'Bu gorsel bir market fisidir.',
+    'Lutfen fisteki sadece gida urunlerini bul.',
+    'Her urun icin su alanlari dondur: name, quantity, unit, estimatedShelfLifeDays.',
+    'name alani standartlastirilmis kisa urun ismi olsun.',
+    'quantity alani sadece sayisal deger olsun.',
+    'unit alani birim metni olsun (ornek: adet, paket, gram, litre).',
+    'estimatedShelfLifeDays alani urun icin tahmini ortalama raf omrunu gun cinsinden sayi olarak ver.',
+    'Sonucu sadece JSON dizisi olarak dondur, baska hicbir metin ekleme.',
+  ].join(' ')
+
+  const genAi = new GoogleGenerativeAI(apiKey)
+  const model = genAi.getGenerativeModel({
+    model: RECEIPT_VISION_MODEL,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+    },
+  })
+
+  const result = await model.generateContent([
+    prompt,
+    {
+      inlineData: {
+        mimeType,
+        data: base64Data,
+      },
+    },
+  ])
+
+  const rawText = result?.response?.text?.() || ''
+  return parseReceiptJsonResponse(rawText)
 }

@@ -24,6 +24,11 @@ const daysFromNow = (days) => {
   return targetDate.toISOString().slice(0, 10)
 }
 
+const toPositiveNumber = (value, fallbackValue = 1) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackValue
+}
+
 const getSystemTheme = () => {
   if (
     globalThis.window === undefined ||
@@ -157,6 +162,38 @@ export const usePantryStore = create((set) => ({
 
       return {
         products: [newProduct, ...state.products],
+      }
+    }),
+
+  addProductsBatch: (productList) =>
+    set((state) => {
+      const normalizedProducts = (Array.isArray(productList) ? productList : [])
+        .map((item) => {
+          const name = String(item?.name ?? '').trim()
+          if (!name) {
+            return null
+          }
+
+          const quantity = toPositiveNumber(item?.quantity, 1)
+          const unit = String(item?.unit ?? 'adet').trim() || 'adet'
+          const shelfLifeDays = toPositiveNumber(item?.estimatedShelfLifeDays, 7)
+
+          return {
+            id: createProductId(),
+            name,
+            quantity,
+            unit,
+            estimatedShelfLifeEndDate: daysFromNow(Math.round(shelfLifeDays)),
+          }
+        })
+        .filter(Boolean)
+
+      if (normalizedProducts.length === 0) {
+        return state
+      }
+
+      return {
+        products: [...normalizedProducts, ...state.products],
       }
     }),
 

@@ -39,7 +39,16 @@
     "addButton": "Ürün Ekle",
     "listTitle": "Mutfak Ürünleri",
     "productLine": "{{quantity}} {{unit}} - {{date}}",
-    "deleteProductAria": "{{name}} ürününü sil"
+    "deleteProductAria": "{{name}} ürününü sil",
+    "receipt": {
+      "title": "Fişten Otomatik Stok Ekleme",
+      "description": "Kamera veya galeriden fiş fotoğrafı yükleyin, ürünler kilerinize otomatik eklensin.",
+      "uploadButton": "Kamera / Fiş Fotoğrafı Yükle",
+      "loadingMessage": "Fişiniz yapay zeka tarafından analiz ediliyor...",
+      "loadingHint": "Fişiniz yapay zeka tarafından analiz ediliyor...",
+      "defaultError": "Fiş analizi sırasında bir sorun oluştu.",
+      "successToast": "Süper! Fişteki ürünler kilerinize eklendi."
+    }
   },
   "recipes": {
     "badge": "Tarif",
