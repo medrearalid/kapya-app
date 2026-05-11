@@ -18,12 +18,24 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: #2f2a1e;
   background:
     radial-gradient(circle at 10% -10%, #f2f0e6 0%, transparent 45%),
     radial-gradient(circle at 100% 0%, #e7e2d0 0%, transparent 35%),
     #f8f7f1;
+  transition:
+    background 220ms ease,
+    color 220ms ease;
 }
 
 #root {
   min-height: 100vh;
+}
+
+.dark body {
+  color: #e2e8f0;
+  background:
+    radial-gradient(circle at 10% -15%, rgba(51, 65, 85, 0.4) 0%, transparent 48%),
+    radial-gradient(circle at 100% 0%, rgba(30, 41, 59, 0.42) 0%, transparent 40%),
+    #0b1220;
 }

@@ -1,0 +1,54 @@
+{
+  "navigation": {
+    "home": "Ana Ekran",
+    "pantry": "Buzdolabı",
+    "recipes": "Tarifler",
+    "switchToDark": "Karanlık moda geç",
+    "switchToLight": "Aydınlık moda geç"
+  },
+  "budgetProfiles": {
+    "student": "Öğrenci",
+    "family": "Aile",
+    "luxury": "Lüks"
+  },
+  "dashboard": {
+    "badge": "Ana Ekran",
+    "title": "Ana Ekran",
+    "alarmTitle": "Tüketilmesi Gerekenler (Kırmızı Alarm)",
+    "noUrgentProducts": "Bugün kritik seviyede ürün bulunmuyor.",
+    "urgentProductItem": "{{name}} - {{quantity}} {{unit}} - SKT {{date}}",
+    "generateButton": "Beni İsraftan Kurtar / Tarif Üret",
+    "loadingButton": "Tarifler üretiliyor...",
+    "selectedBudgetProfile": "Seçili Bütçe Profili",
+    "totalProducts": "Toplam Ürün",
+    "expiringTitle": "Yaklaşan Raf Ömrü Uyarıları",
+    "expiringCount": "{{count}} ürün için tüketim planı oluşturulabilir.",
+    "expiringNone": "Şimdilik kritik ürün yok.",
+    "proactiveRecipes": "Proaktif Tarif Önerileri",
+    "portionCost": "Porsiyon maliyeti: {{cost}}",
+    "defaultRequestError": "Tarifler üretilirken bir hata oluştu."
+  },
+  "pantry": {
+    "badge": "Kiler",
+    "title": "Stok Giriş / Çıkış",
+    "budgetProfile": "Bütçe Profili",
+    "addProductTitle": "Yeni Ürün Ekle",
+    "namePlaceholder": "Ürün adı",
+    "quantityPlaceholder": "Miktar",
+    "unitPlaceholder": "Birim",
+    "addButton": "Ürün Ekle",
+    "listTitle": "Mutfak Ürünleri",
+    "productLine": "{{quantity}} {{unit}} - {{date}}",
+    "deleteProductAria": "{{name}} ürününü sil"
+  },
+  "recipes": {
+    "badge": "Tarif",
+    "title": "Yapay Zeka Önerileri",
+    "parametersTitle": "Öneri Parametreleri",
+    "budgetMode": "Bütçe modu: {{profile}}",
+    "availableProducts": "Kullanılabilir ürünler: {{products}}",
+    "noProducts": "Henüz ürün yok",
+    "skeletonTitle": "Tarif İskeleti",
+    "skeletonDescription": "Bu alan, AI servisinden gelen tarif önerilerinin listeleneceği ekran iskeletidir."
+  }
+}

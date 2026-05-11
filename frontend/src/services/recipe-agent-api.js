@@ -19,7 +19,7 @@ export const generateWasteSaverRecipes = async ({
 
   const payload = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(payload?.error || 'Tarif olusturma istegi basarisiz oldu.')
+    throw new Error(payload?.error || 'RECIPE_GENERATION_FAILED')
   }
 
   return payload?.data

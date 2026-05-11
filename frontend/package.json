@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "autoprefixer": "^10.5.0",
+    "i18next": "^26.1.0",
     "lucide-react": "^1.14.0",
     "postcss": "^8.5.14",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-i18next": "^17.0.7",
     "react-router-dom": "^7.15.0",
     "tailwindcss": "^3.4.17",
     "zustand": "^5.0.13"

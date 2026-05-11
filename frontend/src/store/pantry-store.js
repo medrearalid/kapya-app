@@ -1,6 +1,22 @@
 import { create } from 'zustand'
 
-const budgetProfileOptions = ['ogrenci', 'aile', 'luks']
+const THEME_STORAGE_KEY = 'kapya-theme'
+const themeOptions = new Set(['light', 'dark'])
+
+const budgetProfileOptions = [
+  {
+    id: 'öğrenci',
+    labelKey: 'budgetProfiles.student',
+  },
+  {
+    id: 'aile',
+    labelKey: 'budgetProfiles.family',
+  },
+  {
+    id: 'lüks',
+    labelKey: 'budgetProfiles.luxury',
+  },
+]
 
 const daysFromNow = (days) => {
   const targetDate = new Date()
@@ -8,7 +24,39 @@ const daysFromNow = (days) => {
   return targetDate.toISOString().slice(0, 10)
 }
 
-const normalize = (value) => String(value ?? '').trim().toLowerCase()
+const getSystemTheme = () => {
+  if (
+    globalThis.window === undefined ||
+    typeof globalThis.window.matchMedia !== 'function'
+  ) {
+    return 'light'
+  }
+
+  return globalThis.window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
+}
+
+const getSavedTheme = () => {
+  if (globalThis.window === undefined) {
+    return null
+  }
+
+  const savedTheme = globalThis.window.localStorage.getItem(THEME_STORAGE_KEY)
+  return themeOptions.has(savedTheme) ? savedTheme : null
+}
+
+const getInitialTheme = () => getSavedTheme() || getSystemTheme()
+
+const persistTheme = (theme) => {
+  if (globalThis.window === undefined) {
+    return
+  }
+
+  globalThis.window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+}
+
+const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
 
 const createProductId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -37,12 +85,41 @@ const defaultProducts = [
 
 export const budgetProfiles = budgetProfileOptions
 
+export const getBudgetProfileLabelKey = (profileId) =>
+  budgetProfileOptions.find((profile) => profile.id === profileId)?.labelKey ||
+  'budgetProfiles.student'
+
 export const usePantryStore = create((set) => ({
-  selectedBudgetProfile: 'ogrenci',
+  selectedBudgetProfile: 'öğrenci',
+  currentTheme: getInitialTheme(),
   products: defaultProducts,
 
+  initializeThemeFromSystem: () => {
+    const nextTheme = getSavedTheme() || getSystemTheme()
+    set({ currentTheme: nextTheme })
+  },
+
+  setTheme: (theme) => {
+    if (!themeOptions.has(theme)) {
+      return
+    }
+
+    persistTheme(theme)
+    set({ currentTheme: theme })
+  },
+
+  toggleTheme: () =>
+    set((state) => {
+      const nextTheme = state.currentTheme === 'dark' ? 'light' : 'dark'
+      persistTheme(nextTheme)
+
+      return {
+        currentTheme: nextTheme,
+      }
+    }),
+
   updateBudgetProfile: (profile) => {
-    if (!budgetProfileOptions.includes(profile)) {
+    if (!budgetProfileOptions.some((option) => option.id === profile)) {
       return
     }
 
