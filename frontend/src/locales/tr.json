@@ -49,6 +49,18 @@
     "availableProducts": "Kullanılabilir ürünler: {{products}}",
     "noProducts": "Henüz ürün yok",
     "skeletonTitle": "Tarif İskeleti",
-    "skeletonDescription": "Bu alan, AI servisinden gelen tarif önerilerinin listeleneceği ekran iskeletidir."
+    "skeletonDescription": "Bu alan, AI servisinden gelen tarif önerilerinin listeleneceği ekran iskeletidir.",
+    "generatedCount": "{{count}} tarif hazır. Porsiyonu ayarlayıp pişirmeye başlayabilirsin.",
+    "emptyTitle": "Tarif listesi boş",
+    "emptyDescription": "Ana ekrandan 'Beni İsraftan Kurtar / Tarif Üret' butonuna basarak yeni tarifler oluştur.",
+    "portionSize": "{{count}} kişilik",
+    "decreasePortion": "Porsiyonu azalt",
+    "increasePortion": "Porsiyonu artır",
+    "ingredientsTitle": "Malzemeler",
+    "ingredientCalculated": "Gerekli miktar: {{amount}} {{unit}}",
+    "ingredientBase": "1 kişilik baz: {{amount}} {{unit}}",
+    "cookButton": "Bu Tarifi Pişir",
+    "wasteHint": "Stoktan otomatik düşülür, israf önlenir.",
+    "toastSaved": "Harika! Malzemeleri değerlendirerek tasarruf ettin."
   }
 }

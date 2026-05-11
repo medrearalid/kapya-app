@@ -1,11 +1,13 @@
 import { Lightbulb, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getBudgetProfileLabelKey, usePantryStore } from '../store/pantry-store'
+import RecipeCard from '../components/RecipeCard'
 
 function RecipePage() {
   const { t } = useTranslation()
   const selectedBudgetProfile = usePantryStore((state) => state.selectedBudgetProfile)
   const products = usePantryStore((state) => state.products)
+  const generatedRecipes = usePantryStore((state) => state.generatedRecipes)
 
   const ingredientPreview = products.slice(0, 4).map((product) => product.name)
   const selectedBudgetProfileLabel = t(getBudgetProfileLabelKey(selectedBudgetProfile))
@@ -43,9 +45,28 @@ function RecipePage() {
           {t('recipes.skeletonTitle')}
         </p>
         <p className="mt-2 text-sm text-emerald-900 dark:text-emerald-200">
-          {t('recipes.skeletonDescription')}
+          {generatedRecipes.length > 0
+            ? t('recipes.generatedCount', { count: generatedRecipes.length })
+            : t('recipes.skeletonDescription')}
         </p>
       </article>
+
+      {generatedRecipes.length > 0 ? (
+        <div className="space-y-3">
+          {generatedRecipes.map((recipe, index) => (
+            <RecipeCard key={`${recipe?.tarifAdi || 'tarif'}-${index}`} recipe={recipe} />
+          ))}
+        </div>
+      ) : (
+        <article className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/85">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {t('recipes.emptyTitle')}
+          </p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            {t('recipes.emptyDescription')}
+          </p>
+        </article>
+      )}
     </section>
   )
 }

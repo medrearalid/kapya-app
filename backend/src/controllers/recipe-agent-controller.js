@@ -1,4 +1,4 @@
-import { generateWasteSaverRecipes } from '../services/recipe-agent-service.js'
+import { generateWasteSaverRecipes } from '../services/geminiService.js'
 
 export const postWasteSaverRecipes = async (request, response, next) => {
   try {

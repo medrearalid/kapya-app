@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Boxes, LoaderCircle, Siren, Sparkles, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { getBudgetProfileLabelKey, usePantryStore } from '../store/pantry-store'
 import { generateWasteSaverRecipes } from '../services/recipe-agent-api'
 
@@ -21,11 +22,12 @@ const calculateDaysLeft = (dateValue) => {
 
 function DashboardPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const selectedBudgetProfile = usePantryStore((state) => state.selectedBudgetProfile)
   const products = usePantryStore((state) => state.products)
+  const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
 
   const [isGeneratingRecipes, setIsGeneratingRecipes] = useState(false)
-  const [generatedRecipes, setGeneratedRecipes] = useState([])
   const [requestError, setRequestError] = useState('')
 
   const urgentProducts = useMemo(
@@ -57,9 +59,14 @@ function DashboardPage() {
         urgentProducts,
       })
 
-      setGeneratedRecipes(Array.isArray(recipeData?.tarifler) ? recipeData.tarifler : [])
+      const recipeList = Array.isArray(recipeData?.tarifler) ? recipeData.tarifler : []
+      if (recipeList.length === 0) {
+        throw new Error('RECIPE_GENERATION_FAILED')
+      }
+
+      setGeneratedRecipes(recipeList)
+      navigate('/recipes')
     } catch (error) {
-      setGeneratedRecipes([])
       setRequestError(
         error?.message === 'RECIPE_GENERATION_FAILED'
           ? t('dashboard.defaultRequestError')
@@ -165,34 +172,6 @@ function DashboardPage() {
               : t('dashboard.expiringNone')}
           </p>
         </article>
-
-        {generatedRecipes.length > 0 ? (
-          <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/25">
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-900 dark:text-emerald-200">
-              {t('dashboard.proactiveRecipes')}
-            </p>
-            <ul className="mt-3 space-y-3">
-              {generatedRecipes.map((recipe, index) => (
-                <li
-                  key={`${recipe.tarifAdi}-${index}`}
-                  className="rounded-xl bg-white/85 p-3 dark:bg-slate-900/55"
-                >
-                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                    {recipe.tarifAdi}
-                  </p>
-                  <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-200">
-                    {recipe.kisaAciklama}
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-emerald-900 dark:text-emerald-100">
-                    {t('dashboard.portionCost', {
-                      cost: recipe.tahminiPorsiyonBasiMaliyet,
-                    })}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </article>
-        ) : null}
       </div>
     </section>
   )

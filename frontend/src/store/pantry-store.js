@@ -58,6 +58,12 @@ const persistTheme = (theme) => {
 
 const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
 
+const normalizeIngredient = (ingredient) => ({
+  name: String(ingredient?.name ?? ingredient?.isim ?? '').trim(),
+  baseAmount: Number(ingredient?.baseAmount ?? ingredient?.bazMiktar ?? 0),
+  unit: String(ingredient?.unit ?? ingredient?.birim ?? '').trim(),
+})
+
 const createProductId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -93,6 +99,8 @@ export const usePantryStore = create((set) => ({
   selectedBudgetProfile: 'öğrenci',
   currentTheme: getInitialTheme(),
   products: defaultProducts,
+  generatedRecipes: [],
+  toastMessage: null,
 
   initializeThemeFromSystem: () => {
     const nextTheme = getSavedTheme() || getSystemTheme()
@@ -150,6 +158,72 @@ export const usePantryStore = create((set) => ({
       return {
         products: [newProduct, ...state.products],
       }
+    }),
+
+  setGeneratedRecipes: (recipes) =>
+    set({
+      generatedRecipes: Array.isArray(recipes) ? recipes : [],
+    }),
+
+  clearGeneratedRecipes: () =>
+    set({
+      generatedRecipes: [],
+    }),
+
+  consumeRecipeIngredients: ({ ingredients, portionSize = 1 }) =>
+    set((state) => {
+      const multiplier = Math.max(1, Number(portionSize) || 1)
+      const usageByName = new Map()
+
+      ;(Array.isArray(ingredients) ? ingredients : [])
+        .map(normalizeIngredient)
+        .filter((ingredient) => ingredient.name && ingredient.baseAmount > 0)
+        .forEach((ingredient) => {
+          const key = normalize(ingredient.name)
+          const currentAmount = usageByName.get(key) || 0
+          usageByName.set(key, currentAmount + ingredient.baseAmount * multiplier)
+        })
+
+      const updatedProducts = state.products.flatMap((product) => {
+        const neededAmount = usageByName.get(normalize(product.name)) || 0
+        if (neededAmount <= 0) {
+          return [product]
+        }
+
+        const currentQuantity = Number(product.quantity)
+        const remainingQuantity =
+          Number.isFinite(currentQuantity) && currentQuantity > 0
+            ? Number((currentQuantity - neededAmount).toFixed(2))
+            : 0
+
+        if (remainingQuantity <= 0) {
+          return []
+        }
+
+        return [
+          {
+            ...product,
+            quantity: remainingQuantity,
+          },
+        ]
+      })
+
+      return {
+        products: updatedProducts,
+      }
+    }),
+
+  showToast: (message) =>
+    set({
+      toastMessage: {
+        id: Date.now(),
+        message,
+      },
+    }),
+
+  clearToast: () =>
+    set({
+      toastMessage: null,
     }),
 
   removeProduct: (idOrName) =>
