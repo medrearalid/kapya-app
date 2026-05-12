@@ -6,6 +6,8 @@ const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 const NANO_BANANA_FALLBACK_IMAGE =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5J2nEAAAAASUVORK5CYII='
 
+const MAX_MISSING_INGREDIENTS = 3
+
 const TR_TO_EN_INGREDIENT_MAP = {
   yumurta: 'egg',
   sut: 'milk',
@@ -285,6 +287,14 @@ const getLlmClient = () => {
   })
 }
 
+const getLlmClientOrNull = () => {
+  try {
+    return getLlmClient()
+  } catch {
+    return null
+  }
+}
+
 const translateIngredientNamesToEnglish = async ({ llm, pantryIngredientNames }) => {
   const normalizedNames = pantryIngredientNames
     .map((name) => String(name ?? '').trim())
@@ -308,6 +318,10 @@ const translateIngredientNamesToEnglish = async ({ llm, pantryIngredientNames })
   })
 
   if (missingNames.length === 0) {
+    return fallbackTranslations
+  }
+
+  if (!llm) {
     return fallbackTranslations
   }
 
@@ -341,7 +355,7 @@ const translateIngredientNamesToEnglish = async ({ llm, pantryIngredientNames })
 }
 
 const buildConstraintTranslatorOutput = async ({ llm, acceptedMeals }) => {
-  if (acceptedMeals.length === 0) {
+  if (acceptedMeals.length === 0 || !llm) {
     return []
   }
 
@@ -492,8 +506,46 @@ const rankMealsByStockFit = ({ mealDetails, pantryEnglishSet }) => {
     })
 }
 
+const buildPantryFallbackRecipes = ({ pantryStock }) => {
+  const stock = sanitizeProductList(pantryStock)
+  if (stock.length === 0) {
+    return []
+  }
+
+  return stock.slice(0, 3).map((product, index) => {
+    const dishName = `${product.name} Tavasi`
+
+    return {
+      tarifAdi: dishName,
+      kisaAciklama: 'Stoktaki urunleri hizla degerlendirmek icin pratik bir alternatif.',
+      tahminiSuresi: '20-30 dakika',
+      goruntuUrl: NANO_BANANA_FALLBACK_IMAGE,
+      matchedIngredients: [
+        {
+          isim: product.name,
+          miktar: String(Math.max(1, Number(product.quantity) || 1)),
+          birim: product.unit || 'adet',
+        },
+      ],
+      missingIngredients: [
+        {
+          isim: 'zeytinyagi',
+          miktar: '1',
+          birim: 'yemek kasigi',
+        },
+      ],
+      pisirmeAdimlari: [
+        `Adim 1: ${product.name} malzemesini hazirlayin.`,
+        'Adim 2: Tavayi isitin ve az miktarda yag ekleyin.',
+        'Adim 3: Malzemeleri orta ateste kontrollu sekilde pisirin.',
+        `Adim 4: Sicakken servis edin.${index === 0 ? '' : ' Istege gore baharat ekleyin.'}`,
+      ],
+    }
+  })
+}
+
 export const executeKapyaAgent = async ({ pantryStock, urgentProducts }) => {
-  const llm = getLlmClient()
+  const llm = getLlmClientOrNull()
 
   const normalizedPantryStock = sanitizeProductList(pantryStock)
   const normalizedUrgentProducts = sanitizeProductList(urgentProducts)
@@ -521,7 +573,9 @@ export const executeKapyaAgent = async ({ pantryStock, urgentProducts }) => {
 
   const mealIds = Array.from(new Set(mealIdGroups.flat())).slice(0, 24)
   if (mealIds.length === 0) {
-    return { tarifler: [] }
+    return {
+      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
+    }
   }
 
   const rawMealDetails = await Promise.all(mealIds.map((mealId) => fetchMealDetailById(mealId)))
@@ -529,14 +583,27 @@ export const executeKapyaAgent = async ({ pantryStock, urgentProducts }) => {
     .filter(Boolean)
     .filter((meal) => Array.isArray(meal.ingredients) && meal.ingredients.length > 0)
 
+  if (mealDetails.length === 0) {
+    return {
+      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
+    }
+  }
+
   const rankedMeals = rankMealsByStockFit({
     mealDetails,
     pantryEnglishSet,
   })
 
-  const acceptedMeals = rankedMeals.filter((meal) => meal.missingCount <= 3).slice(0, 3)
+  const strictMeals = rankedMeals.filter((meal) => meal.missingCount <= MAX_MISSING_INGREDIENTS)
+  const acceptedMeals =
+    strictMeals.length > 0
+      ? strictMeals.slice(0, 3)
+      : rankedMeals.slice(0, 3)
+
   if (acceptedMeals.length === 0) {
-    return { tarifler: [] }
+    return {
+      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
+    }
   }
 
   const translatedRecipes = await buildConstraintTranslatorOutput({
@@ -597,6 +664,12 @@ export const executeKapyaAgent = async ({ pantryStock, urgentProducts }) => {
       }
     }),
   )
+
+  if (tarifler.length === 0) {
+    return {
+      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
+    }
+  }
 
   return { tarifler }
 }

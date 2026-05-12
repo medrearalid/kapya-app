@@ -1,144 +1,187 @@
-import { CheckCircle2, Minus, Plus, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Sparkles } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import MealPlanSheet from './meal-plan-sheet'
 import TapButton from './tap-button'
 import { usePantryStore } from '../store/pantry-store'
+import { usePlannerStore } from '../store/planner-store'
 
-const normalizeIngredient = (ingredient) => ({
-  name: String(ingredient?.name ?? ingredient?.isim ?? '').trim(),
-  baseAmount: Number(ingredient?.baseAmount ?? ingredient?.bazMiktar ?? 0),
-  unit: String(ingredient?.unit ?? ingredient?.birim ?? '').trim(),
+const normalizeCompactIngredient = (ingredient) => ({
+  isim: String(ingredient?.isim ?? ingredient?.name ?? '').trim(),
+  miktar: String(ingredient?.miktar ?? ingredient?.baseAmount ?? '1').trim() || '1',
+  birim: String(ingredient?.birim ?? ingredient?.unit ?? 'adet').trim() || 'adet',
 })
 
-const formatAmount = (amount) => {
-  const rounded = Number(amount.toFixed(2))
-  return String(rounded)
-}
+const getTodayDate = () => new Date().toISOString().slice(0, 10)
 
 function RecipeCard({ recipe }) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const consumeRecipeIngredients = usePantryStore((state) => state.consumeRecipeIngredients)
-  const clearRecentRecipes = usePantryStore((state) => state.clearRecentRecipes)
   const showToast = usePantryStore((state) => state.showToast)
+  const addPlannedMeal = usePlannerStore((state) => state.addPlannedMeal)
 
+  const [isPlanSheetOpen, setIsPlanSheetOpen] = useState(false)
+  const [plannedDate, setPlannedDate] = useState(getTodayDate)
+  const [mealType, setMealType] = useState('ogle')
   const [portionSize, setPortionSize] = useState(2)
 
-  const ingredients = useMemo(
+  const matchedIngredients = useMemo(
     () =>
-      (Array.isArray(recipe?.malzemeler) ? recipe.malzemeler : [])
-        .map(normalizeIngredient)
-        .filter((ingredient) => ingredient.name && ingredient.baseAmount > 0),
+      (Array.isArray(recipe?.matchedIngredients) ? recipe.matchedIngredients : [])
+        .map(normalizeCompactIngredient)
+        .filter((ingredient) => ingredient.isim),
     [recipe],
   )
 
-  const calculatedIngredients = useMemo(
+  const missingIngredients = useMemo(
     () =>
-      ingredients.map((ingredient) => ({
-        ...ingredient,
-        totalAmount: ingredient.baseAmount * portionSize,
-      })),
-    [ingredients, portionSize],
+      (Array.isArray(recipe?.missingIngredients) ? recipe.missingIngredients : [])
+        .map(normalizeCompactIngredient)
+        .filter((ingredient) => ingredient.isim),
+    [recipe],
   )
 
-  const decrementPortion = () => {
-    setPortionSize((current) => Math.max(1, current - 1))
-  }
+  const cookingSteps = useMemo(
+    () =>
+      (Array.isArray(recipe?.pisirmeAdimlari) ? recipe.pisirmeAdimlari : [])
+        .map((step) => String(step ?? '').trim())
+        .filter(Boolean),
+    [recipe],
+  )
 
-  const incrementPortion = () => {
-    setPortionSize((current) => Math.min(12, current + 1))
-  }
+  const compactRecipe = useMemo(
+    () => ({
+      tarifAdi: String(recipe?.tarifAdi ?? '').trim(),
+      kisaAciklama: String(recipe?.kisaAciklama ?? '').trim(),
+      tahminiSuresi: String(recipe?.tahminiSuresi ?? '').trim(),
+      goruntuUrl: String(recipe?.goruntuUrl ?? '').trim(),
+      matchedIngredients,
+      missingIngredients,
+      pisirmeAdimlari: cookingSteps,
+    }),
+    [recipe, matchedIngredients, missingIngredients, cookingSteps],
+  )
 
-  const handleCookRecipe = () => {
-    consumeRecipeIngredients({
-      ingredients,
+  const handlePlanRecipe = () => {
+    addPlannedMeal({
+      date: plannedDate,
+      mealType,
       portionSize,
+      recipe: compactRecipe,
     })
-    clearRecentRecipes()
 
-    showToast(t('recipes.toastSaved'))
-    navigate('/')
+    setIsPlanSheetOpen(false)
+    showToast(t('planner.planSavedToast'))
+  }
+
+  const openPlanSheet = () => {
+    setPlannedDate(getTodayDate())
+    setMealType('ogle')
+    setPortionSize(2)
+    setIsPlanSheetOpen(true)
   }
 
   return (
     <article className="glass-panel soft-card rounded-2xl border border-sage-200/65 bg-white/75 p-4 dark:border-sage-900/40 dark:bg-slate-900/60">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{recipe?.tarifAdi}</p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{recipe?.kisaAciklama}</p>
-          <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-200">
-            {recipe?.tahminiPorsiyonBasiMaliyet}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-600 dark:bg-slate-800">
-          <div className="flex items-center gap-1">
-            <TapButton
-              type="button"
-              onClick={decrementPortion}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
-              aria-label={t('recipes.decreasePortion')}
-            >
-              <Minus className="h-4 w-4" aria-hidden="true" />
-            </TapButton>
-            <span className="min-w-16 text-center text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {t('recipes.portionSize', { count: portionSize })}
-            </span>
-            <TapButton
-              type="button"
-              onClick={incrementPortion}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
-              aria-label={t('recipes.increasePortion')}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-            </TapButton>
-          </div>
-        </div>
+      <div className="overflow-hidden rounded-2xl border border-white/60 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+        <img
+          src={recipe?.goruntuUrl || ''}
+          alt={recipe?.tarifAdi || 'Tarif gorseli'}
+          className="h-44 w-full object-cover"
+          loading="lazy"
+        />
       </div>
 
-      <div className="mt-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-          {t('recipes.ingredientsTitle')}
+      <div className="mt-3">
+        <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{recipe?.tarifAdi}</p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{recipe?.kisaAciklama}</p>
+        <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('recipes.timeLabel', { time: recipe?.tahminiSuresi || '-' })}
         </p>
-        <ul className="mt-2 space-y-2">
-          {calculatedIngredients.map((ingredient) => (
-            <li
-              key={`${ingredient.name}-${ingredient.unit}`}
-              className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/65"
-            >
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{ingredient.name}</p>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                {t('recipes.ingredientCalculated', {
-                  amount: formatAmount(ingredient.totalAmount),
-                  unit: ingredient.unit,
-                })}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t('recipes.ingredientBase', {
-                  amount: formatAmount(ingredient.baseAmount),
-                  unit: ingredient.unit,
-                })}
-              </p>
-            </li>
-          ))}
-        </ul>
       </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/75 p-3 dark:border-emerald-800/70 dark:bg-emerald-950/25">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800 dark:text-emerald-200">
+            {t('recipes.matchedIngredientsTitle')}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {matchedIngredients.length > 0 ? (
+              matchedIngredients.map((ingredient) => (
+                <li key={`${ingredient.isim}-matched`} className="flex items-center gap-2 text-xs text-emerald-900 dark:text-emerald-200">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{ingredient.isim}</span>
+                  <span className="ml-auto shrink-0">{ingredient.miktar} {ingredient.birim}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-emerald-800/80 dark:text-emerald-300/80">{t('recipes.noMatchedIngredients')}</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-rose-200/70 bg-rose-50/75 p-3 dark:border-rose-800/70 dark:bg-rose-950/25">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-800 dark:text-rose-200">
+            {t('recipes.missingIngredientsTitle')}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {missingIngredients.length > 0 ? (
+              missingIngredients.map((ingredient) => (
+                <li key={`${ingredient.isim}-missing`} className="flex items-center gap-2 text-xs text-rose-900 dark:text-rose-200">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{ingredient.isim}</span>
+                  <span className="ml-auto shrink-0">{ingredient.miktar} {ingredient.birim}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-rose-800/80 dark:text-rose-300/80">{t('recipes.noMissingIngredients')}</li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      <details className="mt-4 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/65">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {t('recipes.stepsTitle')}
+        </summary>
+        <ol className="mt-2 space-y-1.5 pl-4 text-xs text-slate-700 dark:text-slate-300">
+          {cookingSteps.map((step, index) => (
+            <li key={`${recipe?.tarifAdi || 'tarif'}-step-${index}`}>{step}</li>
+          ))}
+        </ol>
+      </details>
 
       <TapButton
         type="button"
-        onClick={handleCookRecipe}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sage-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sage-700"
+        onClick={openPlanSheet}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-kapya-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-kapya-700"
       >
         <Sparkles className="h-4 w-4" aria-hidden="true" />
-        {t('recipes.cookButton')}
+        {t('recipes.planButton')}
       </TapButton>
 
-      <p className="mt-2 flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
-        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-        {t('recipes.wasteHint')}
-      </p>
+      <MealPlanSheet
+        isOpen={isPlanSheetOpen}
+        mealDate={plannedDate}
+        mealType={mealType}
+        portionSize={portionSize}
+        onDateChange={setPlannedDate}
+        onMealTypeChange={setMealType}
+        onPortionSizeChange={setPortionSize}
+        onClose={() => setIsPlanSheetOpen(false)}
+        onSubmit={handlePlanRecipe}
+        labels={{
+          title: t('planner.sheetTitle'),
+          dayLabel: t('planner.dayLabel'),
+          mealTypeLabel: t('planner.mealTypeLabel'),
+          portionLabel: t('planner.portionLabel'),
+          lunch: t('planner.lunch'),
+          dinner: t('planner.dinner'),
+          cancelButton: t('planner.cancelButton'),
+          saveButton: t('planner.saveButton'),
+        }}
+      />
     </article>
   )
 }
@@ -149,16 +192,22 @@ RecipeCard.propTypes = {
   recipe: PropTypes.shape({
     tarifAdi: PropTypes.string,
     kisaAciklama: PropTypes.string,
-    tahminiPorsiyonBasiMaliyet: PropTypes.string,
-    malzemeler: PropTypes.arrayOf(
+    tahminiSuresi: PropTypes.string,
+    goruntuUrl: PropTypes.string,
+    matchedIngredients: PropTypes.arrayOf(
       PropTypes.shape({
-        name: PropTypes.string,
-        baseAmount: PropTypes.number,
-        unit: PropTypes.string,
         isim: PropTypes.string,
-        bazMiktar: PropTypes.number,
+        miktar: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
         birim: PropTypes.string,
       }),
     ),
+    missingIngredients: PropTypes.arrayOf(
+      PropTypes.shape({
+        isim: PropTypes.string,
+        miktar: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        birim: PropTypes.string,
+      }),
+    ),
+    pisirmeAdimlari: PropTypes.arrayOf(PropTypes.string),
   }),
 }
