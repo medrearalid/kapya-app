@@ -268,6 +268,74 @@ function PantryPage() {
 
       <article className="glass-panel soft-card rounded-2xl p-4">
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sand-700 dark:text-slate-400">
+          {t('pantry.listTitle')}
+        </h2>
+        {sortedProducts.length === 0 ? (
+          <p className="mt-3 text-sm text-sand-700 dark:text-slate-300">{t('pantry.emptyState')}</p>
+        ) : (
+          <div className="mt-2 space-y-4">
+            {groupedProducts.map(([category, items]) => (
+              <div key={category}>
+                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-sand-500 dark:text-slate-500">
+                  {category}
+                </h3>
+                <motion.ul
+                  className="space-y-1.5"
+                  variants={listContainerVariants}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {items.map((product) => (
+                    <motion.li
+                      key={product.id}
+                      variants={listItemVariants}
+                      className="glass-panel flex items-center justify-between rounded-xl border border-white/55 bg-white/62 px-3 py-2 dark:border-slate-700/65 dark:bg-slate-800/62"
+                    >
+                      <p className="text-sm font-medium text-sand-900 dark:text-slate-100">
+                        {product.name}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1 rounded-lg border border-white/50 bg-white/70 px-1.5 py-1 dark:border-slate-600/70 dark:bg-slate-700/70">
+                          <TapButton
+                            type="button"
+                            onClick={() => handleAdjustProductQuantity(product, -1)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
+                            aria-label={t('pantry.decreaseQuantityAria', { name: product.name })}
+                          >
+                            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+                          </TapButton>
+                          <span className="min-w-16 text-center text-xs font-semibold text-sand-900 dark:text-slate-100">
+                            {product.quantity} {product.unit}
+                          </span>
+                          <TapButton
+                            type="button"
+                            onClick={() => handleAdjustProductQuantity(product, 1)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
+                            aria-label={t('pantry.increaseQuantityAria', { name: product.name })}
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                          </TapButton>
+                        </div>
+                        <TapButton
+                          type="button"
+                          onClick={() => removeProduct(product.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/75 text-kapya-700 dark:bg-slate-700/70 dark:text-kapya-200"
+                          aria-label={t('pantry.deleteProductAria', { name: product.name })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </TapButton>
+                      </div>
+                    </motion.li>
+                  ))}
+                </motion.ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </article>
+
+      <article className="glass-panel soft-card rounded-2xl p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sand-700 dark:text-slate-400">
           {t('pantry.addProductTitle')}
         </h2>
         <form className="mt-3 grid gap-3" onSubmit={handleSubmit}>
@@ -412,74 +480,6 @@ function PantryPage() {
           </div>
         </article>
       ) : null}
-
-      <article className="glass-panel soft-card rounded-2xl p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sand-700 dark:text-slate-400">
-          {t('pantry.listTitle')}
-        </h2>
-        {sortedProducts.length === 0 ? (
-          <p className="mt-3 text-sm text-sand-700 dark:text-slate-300">{t('pantry.emptyState')}</p>
-        ) : (
-          <div className="mt-2 space-y-4">
-            {groupedProducts.map(([category, items]) => (
-              <div key={category}>
-                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-sand-500 dark:text-slate-500">
-                  {category}
-                </h3>
-                <motion.ul
-                  className="space-y-1.5"
-                  variants={listContainerVariants}
-                  initial="hidden"
-                  animate="show"
-                >
-                  {items.map((product) => (
-                    <motion.li
-                      key={product.id}
-                      variants={listItemVariants}
-                      className="glass-panel flex items-center justify-between rounded-xl border border-white/55 bg-white/62 px-3 py-2 dark:border-slate-700/65 dark:bg-slate-800/62"
-                    >
-                      <p className="text-sm font-medium text-sand-900 dark:text-slate-100">
-                        {product.name}
-                      </p>
-                      <div className="flex items-center gap-1.5">
-                        <div className="inline-flex items-center gap-1 rounded-lg border border-white/50 bg-white/70 px-1.5 py-1 dark:border-slate-600/70 dark:bg-slate-700/70">
-                          <TapButton
-                            type="button"
-                            onClick={() => handleAdjustProductQuantity(product, -1)}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
-                            aria-label={t('pantry.decreaseQuantityAria', { name: product.name })}
-                          >
-                            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-                          </TapButton>
-                          <span className="min-w-16 text-center text-xs font-semibold text-sand-900 dark:text-slate-100">
-                            {product.quantity} {product.unit}
-                          </span>
-                          <TapButton
-                            type="button"
-                            onClick={() => handleAdjustProductQuantity(product, 1)}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
-                            aria-label={t('pantry.increaseQuantityAria', { name: product.name })}
-                          >
-                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                          </TapButton>
-                        </div>
-                        <TapButton
-                          type="button"
-                          onClick={() => removeProduct(product.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/75 text-kapya-700 dark:bg-slate-700/70 dark:text-kapya-200"
-                          aria-label={t('pantry.deleteProductAria', { name: product.name })}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        </TapButton>
-                      </div>
-                    </motion.li>
-                  ))}
-                </motion.ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </article>
 
       <input
         ref={receiptInputRef}

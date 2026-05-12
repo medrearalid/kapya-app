@@ -740,7 +740,7 @@ function RecipePage() {
     const agentInstruction =
       urgentProducts.length > 0
         ? 'Bu acil urunleri merkeze alarak israf onleyici tarif uret.'
-        : 'Buzdolabindaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
+        : 'Mutfaktaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
     const requestMode = urgentProducts.length > 0 ? 'waste-prevent' : 'daily-profile'
 
     try {

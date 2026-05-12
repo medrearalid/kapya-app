@@ -5,7 +5,6 @@ import './index.css'
 import './utils/i18n'
 import RootLayout from './components/root-layout'
 import GlobalErrorDisplay from './components/GlobalErrorDisplay'
-import DashboardPage from './pages/dashboard-page'
 import PantryPage from './pages/pantry-page'
 import PlannerPage from './pages/planner-page'
 import RecipeDetailPage from './pages/recipe-detail-page'
@@ -20,7 +19,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardPage />,
+        element: <PantryPage />,
       },
       {
         path: 'pantry',

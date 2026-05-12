@@ -10,7 +10,7 @@ const RECEIPT_ALLOWED_UNITS = new Set([
   'gram',
   'paket',
   'litre',
-  'var',
+  'mevcut',
 ])
 
 const RECEIPT_NON_FOOD_KEYWORDS = [
@@ -417,8 +417,8 @@ export const analyzeReceiptImage = async ({ imageBase64 }) => {
     'Gida disi urunleri ASLA ekleme (ornek: bardak, tabak, mutfak esyasi, temizlik urunu).',
     'Emin degilsen urunu hic ekleme.',
     'Her urun icin su alanlari dondur: name, quantity, unit, estimatedShelfLifeDays, kategori.',
-    'KURAL 1 - URUN ADI: Fisteki tum kisaltmalari ve kodlari duzelterek temiz Turkce ile yaz; sadece ilk harfi buyuk olsun (Ornek: "DMT 1KG"->"Domates", "YMR"->"Yumurta", "ZYT YAG 0.75L"->"Zeytinyagi").',
-    'KURAL 2 - BIRIM: ASLA kilogram veya kg kullanma; tum kilograms grama donustur (Ornek: 1.5 kg->1500 gram, 500 g->500 gram). Kabul edilen birimler: adet, gram, paket, litre, var.',
+    'KURAL 1 - URUN ADI: Fisteki tum kisaltmalari ve kodlari duzelterek temiz Turkce ile Türkçe karakter kullanarak yaz; sadece ilk harfi buyuk olsun (Ornek: "DMT 1KG"->"Domates", "YMR"->"Yumurta", "ZYT YAG 0.75L"->"Zeytinyagi").',
+    'KURAL 2 - BIRIM: Stoktan düşme hesabını doğru yapabilmek için; hassas birimler kullan (Ornek: 1.5 kg->1500 gram, 1 litre->1000 ml). Kabul edilen birimler: adet, gram, paket, ml, mevcut.',
     'KURAL 3 - BAHARAT: Baharat turundeki her urun (tuz, karabiber, kimyon, pul biber vs.) icin quantity=1 ve unit="var" kullan.',
     'KURAL 4 - KATEGORI: Her urune su kategorilerden birini ata: Sebzeler, Meyveler, Et ve Tavuk, Sut Urunleri, Baharatlar, Atistirmaliklar, Temel Gida, Diger.',
     'KURAL 5: estimatedShelfLifeDays pozitif sayi olsun.',
