@@ -1,7 +1,6 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
 import { DynamicTool } from '@langchain/core/tools'
-import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents'
+import { createAgent } from 'langchain'
 
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
 const MS_PER_DAY = 1000 * 60 * 60 * 24
@@ -57,6 +56,20 @@ const normalizeBudgetProfile = (value) => {
   return DEFAULT_BUDGET_PROFILE
 }
 
+const normalizeAgentInstruction = ({ agentInstruction, requestMode, urgentProducts }) => {
+  const explicitInstruction = String(agentInstruction ?? '').trim()
+  if (explicitInstruction) {
+    return explicitInstruction
+  }
+
+  const hasUrgentProducts = Array.isArray(urgentProducts) && urgentProducts.length > 0
+  if (requestMode === 'waste-prevent' || hasUrgentProducts) {
+    return 'Bu acil urunleri merkeze alarak israf onleyici tarif uret.'
+  }
+
+  return 'Buzdolabindaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
+}
+
 const calculateDaysLeft = (dateValue) => {
   const targetDate = new Date(String(dateValue ?? '').trim())
   if (Number.isNaN(targetDate.getTime())) {
@@ -85,6 +98,11 @@ const sanitizeProduct = (product) => ({
 
 const sanitizeProductList = (products) =>
   (Array.isArray(products) ? products : []).map(sanitizeProduct).filter((item) => item.name)
+
+const sanitizeRecipeNameList = (recipeNames) =>
+  (Array.isArray(recipeNames) ? recipeNames : [])
+    .map((name) => String(name ?? '').trim())
+    .filter(Boolean)
 
 const safeParseJson = (rawValue) => {
   if (typeof rawValue !== 'string') {
@@ -319,6 +337,67 @@ const extractJsonFromText = (rawText) => {
   }
 }
 
+const flattenMessageContent = (content) => {
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === 'string') {
+          return part
+        }
+
+        if (part && typeof part === 'object') {
+          if (typeof part.text === 'string') {
+            return part.text
+          }
+
+          if (typeof part.output_text === 'string') {
+            return part.output_text
+          }
+
+          if (typeof part.content === 'string') {
+            return part.content
+          }
+        }
+
+        return ''
+      })
+      .join('\n')
+  }
+
+  if (content && typeof content === 'object' && typeof content.text === 'string') {
+    return content.text
+  }
+
+  return ''
+}
+
+const extractAgentOutputText = (agentState) => {
+  const messages = Array.isArray(agentState?.messages) ? agentState.messages : []
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    const messageType = String(message?.type ?? '').toLocaleLowerCase('tr-TR')
+    const messageRole = String(message?.role ?? '').toLocaleLowerCase('tr-TR')
+    const isAssistantMessage =
+      messageType.includes('ai') || messageRole === 'assistant' || messageRole === 'ai'
+
+    if (!isAssistantMessage) {
+      continue
+    }
+
+    const text = flattenMessageContent(message?.content).trim()
+    if (text) {
+      return text
+    }
+  }
+
+  return ''
+}
+
 const normalizeIngredient = (ingredient) => ({
   name: String(ingredient?.name ?? ingredient?.isim ?? '').trim(),
   baseAmount: toSafeNumber(ingredient?.baseAmount ?? ingredient?.bazMiktar, 0),
@@ -394,7 +473,14 @@ const normalizeStructuredResponse = ({ parsedResult, inputPayload }) => {
   }
 }
 
-export const executeKapyaAgent = async ({ budgetProfile, pantryStock, urgentProducts }) => {
+export const executeKapyaAgent = async ({
+  budgetProfile,
+  pantryStock,
+  urgentProducts,
+  agentInstruction,
+  requestMode,
+  recentRecipeNames,
+}) => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
   if (!apiKey) {
     const missingKeyError = new Error('Sunucuda GEMINI_API_KEY tanimli degil.')
@@ -406,6 +492,13 @@ export const executeKapyaAgent = async ({ budgetProfile, pantryStock, urgentProd
     budgetProfile: normalizeBudgetProfile(budgetProfile),
     pantryStock: sanitizeProductList(pantryStock),
     urgentProducts: sanitizeProductList(urgentProducts),
+    requestMode: String(requestMode ?? '').trim() || 'auto',
+    agentInstruction: normalizeAgentInstruction({
+      agentInstruction,
+      requestMode,
+      urgentProducts,
+    }),
+    recentRecipeNames: sanitizeRecipeNameList(recentRecipeNames),
   }
 
   const llm = new ChatGoogleGenerativeAI({
@@ -420,54 +513,62 @@ export const executeKapyaAgent = async ({ budgetProfile, pantryStock, urgentProd
     buildGenerateRecipeTool(),
   ]
 
-  const prompt = ChatPromptTemplate.fromMessages([
-    ['system', SYSTEM_PROMPT],
-    [
-      'system',
-      [
-        'Mutlaka sirayla AnalyzeInventoryTool -> CalculateSavingsTool -> GenerateRecipeTool kullan.',
-        'Ardindan sadece gecerli JSON dondur; markdown veya baska metin dondurme.',
-        'JSON semasi:',
-        '{',
-        '  "tarifler": [',
-        '    {',
-        '      "tarifAdi": "string",',
-        '      "kisaAciklama": "string",',
-        '      "tahminiPorsiyonBasiMaliyet": "string",',
-        '      "malzemeler": [',
-        '        { "name": "string", "baseAmount": number, "unit": "string" }',
-        '      ]',
-        '    }',
-        '  ],',
-        '  "tasarrufEdilenTutar": number,',
-        '  "ajanMesaji": "string"',
-        '}',
-        'tarifler dizisinde tam olarak 3 tarif olmalidir.',
-      ].join('\n'),
-    ],
-    ['human', '{input}'],
-    new MessagesPlaceholder('agent_scratchpad'),
-  ])
+  const agentPromptLines = [
+    SYSTEM_PROMPT,
+    'Mutlaka sirayla AnalyzeInventoryTool -> CalculateSavingsTool -> GenerateRecipeTool kullan.',
+    'Kullanicidan gelen agentInstruction alanindaki talimata kesinlikle uy.',
+    'requestMode alani waste-prevent ise acil urunleri onceliklendir; daily-profile ise gunluk dengeli tarif oner.',
+  ]
 
-  const agent = await createToolCallingAgent({
+  if (inputPayload.recentRecipeNames.length > 0) {
+    agentPromptLines.push(
+      `Kullanici daha once onerdigin su tarifleri reddetti: ${inputPayload.recentRecipeNames.join(', ')}. Lutfen bu tarifleri veya cok benzer varyasyonlarini TEKRAR ONERME. Tamamen farkli ve yaratici alternatifler uret.`,
+    )
+  }
+
+  const agentPrompt = [
+    ...agentPromptLines,
+    'Ardindan sadece gecerli JSON dondur; markdown veya baska metin dondurme.',
+    'JSON semasi:',
+    '{',
+    '  "tarifler": [',
+    '    {',
+    '      "tarifAdi": "string",',
+    '      "kisaAciklama": "string",',
+    '      "tahminiPorsiyonBasiMaliyet": "string",',
+    '      "malzemeler": [',
+    '        { "name": "string", "baseAmount": number, "unit": "string" }',
+    '      ]',
+    '    }',
+    '  ],',
+    '  "tasarrufEdilenTutar": number,',
+    '  "ajanMesaji": "string"',
+    '}',
+    'tarifler dizisinde tam olarak 3 tarif olmalidir.',
+  ].join('\n')
+
+  const agent = createAgent({
     llm,
     tools,
-    prompt,
-  })
-
-  const agentExecutor = new AgentExecutor({
-    agent,
-    tools,
-    verbose: true,
+    prompt: agentPrompt,
   })
 
   console.log('[kapya-agent] request', inputPayload)
 
   let result
   try {
-    result = await agentExecutor.invoke({
-      input: JSON.stringify(inputPayload),
+    const agentState = await agent.invoke({
+      messages: [
+        {
+          role: 'user',
+          content: JSON.stringify(inputPayload),
+        },
+      ],
     })
+
+    result = {
+      output: extractAgentOutputText(agentState),
+    }
   } catch {
     const providerError = new Error('Kapya ajanindan gecerli yanit alinamadi.')
     providerError.statusCode = 502

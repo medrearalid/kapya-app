@@ -2,7 +2,14 @@ import { executeKapyaAgent } from '../services/agentService.js'
 
 export const postWasteSaverRecipes = async (request, response, next) => {
   try {
-    const { budgetProfile, pantryStock, urgentProducts } = request.body ?? {}
+    const {
+      budgetProfile,
+      pantryStock,
+      urgentProducts,
+      agentInstruction,
+      requestMode,
+      recentRecipeNames,
+    } = request.body ?? {}
 
     if (!budgetProfile || !Array.isArray(pantryStock) || !Array.isArray(urgentProducts)) {
       return response.status(400).json({
@@ -12,10 +19,20 @@ export const postWasteSaverRecipes = async (request, response, next) => {
       })
     }
 
+    if (recentRecipeNames !== undefined && !Array.isArray(recentRecipeNames)) {
+      return response.status(400).json({
+        success: false,
+        error: 'Gecersiz istek govdesi. recentRecipeNames alani dizi olmalidir.',
+      })
+    }
+
     const agentData = await executeKapyaAgent({
       budgetProfile,
       pantryStock,
       urgentProducts,
+      agentInstruction,
+      requestMode,
+      recentRecipeNames,
     })
 
     return response.status(200).json({

@@ -6,17 +6,28 @@ export const generateWasteSaverRecipes = async ({
   budgetProfile,
   pantryStock,
   urgentProducts,
+  agentInstruction,
+  requestMode,
+  recentRecipeNames,
 }) => {
+  const payload = {
+    budgetProfile,
+    pantryStock,
+    urgentProducts,
+    agentInstruction,
+    requestMode,
+  }
+
+  if (Array.isArray(recentRecipeNames) && recentRecipeNames.length > 0) {
+    payload.recentRecipeNames = recentRecipeNames
+  }
+
   const response = await fetch(buildApiUrl('/api/ai/recipes/waste-saver'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      budgetProfile,
-      pantryStock,
-      urgentProducts,
-    }),
+    body: JSON.stringify(payload),
   })
 
   const payload = await response.json().catch(() => null)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, LoaderCircle, ScanLine, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +8,11 @@ import { getBudgetProfileLabelKey, usePantryStore } from '../store/pantry-store'
 import { generateWasteSaverRecipes } from '../services/recipe-agent-api'
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24
+const LOADING_STEP_KEYS = [
+  'dashboard.loadingStepChefThinking',
+  'dashboard.loadingStepInventoryCheck',
+  'dashboard.loadingStepRecipeCrafting',
+]
 
 const calculateDaysLeft = (dateValue) => {
   const targetDate = new Date(dateValue)
@@ -31,6 +36,7 @@ function DashboardPage() {
   const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
 
   const [isGeneratingRecipes, setIsGeneratingRecipes] = useState(false)
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0)
   const [requestError, setRequestError] = useState('')
 
   const urgentProducts = useMemo(
@@ -42,16 +48,44 @@ function DashboardPage() {
     [products],
   )
 
+  const hasUrgentProducts = urgentProducts.length > 0
+
+  useEffect(() => {
+    if (!isGeneratingRecipes) {
+      setLoadingStepIndex(0)
+      return
+    }
+
+    const intervalId = setInterval(() => {
+      setLoadingStepIndex((current) => (current + 1) % LOADING_STEP_KEYS.length)
+    }, 1400)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [isGeneratingRecipes])
+
   const handleGenerateRecipes = async () => {
+    if (isGeneratingRecipes) {
+      return
+    }
+
     setIsGeneratingRecipes(true)
     setRequestError('')
     setAgentInsight(null)
+
+    const agentInstruction = hasUrgentProducts
+      ? 'Bu acil urunleri merkeze alarak israf onleyici tarif uret.'
+      : 'Buzdolabindaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
+    const requestMode = hasUrgentProducts ? 'waste-prevent' : 'daily-profile'
 
     try {
       const recipeData = await generateWasteSaverRecipes({
         budgetProfile: selectedBudgetProfile,
         pantryStock: products,
         urgentProducts,
+        agentInstruction,
+        requestMode,
       })
 
       const recipeList = Array.isArray(recipeData?.tarifler) ? recipeData.tarifler : []
@@ -147,25 +181,22 @@ function DashboardPage() {
         <TapButton
           type="button"
           onClick={handleGenerateRecipes}
-          disabled={isGeneratingRecipes || urgentProducts.length === 0}
-          className="animate-kapya-pulse inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 py-4 text-base font-semibold text-white shadow-float transition hover:bg-kapya-700 disabled:cursor-not-allowed disabled:animate-none disabled:bg-kapya-300 dark:disabled:bg-kapya-900/40"
+          className="animate-kapya-pulse inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 py-4 text-base font-semibold text-white shadow-float transition hover:bg-kapya-700"
         >
           {isGeneratingRecipes ? (
             <>
               <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
-              {t('dashboard.loadingButton')}
+              {t(LOADING_STEP_KEYS[loadingStepIndex])}
             </>
           ) : (
             <>
               <Sparkles className="h-5 w-5" aria-hidden="true" />
-              {t('dashboard.generateButton')}
+              {hasUrgentProducts
+                ? t('dashboard.generateButtonUrgent')
+                : t('dashboard.generateButton')}
             </>
           )}
         </TapButton>
-
-        <p className="text-center text-xs font-semibold text-kapya-700 dark:text-kapya-300">
-          {t('dashboard.generateButtonAssist')}
-        </p>
 
         {requestError ? (
           <p className="text-xs text-kapya-900 dark:text-kapya-300">{requestError}</p>

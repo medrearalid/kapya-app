@@ -30,9 +30,12 @@
     "noUrgentProducts": "Her şey taze",
     "urgentProductItem": "{{name}} · {{quantity}} {{unit}} · {{days}} gün kaldı",
     "scanReceiptButton": "Fiş Okut",
-    "generateButton": "Bugün Ne Yesem?",
-    "generateButtonAssist": "Beni İsraftan Kurtar / Tarif Üret",
+    "generateButton": "Tarif Üret",
+    "generateButtonUrgent": "İsraftan Kurtar",
     "loadingButton": "Tarifler üretiliyor...",
+    "loadingStepChefThinking": "Şef Düşünüyor...",
+    "loadingStepInventoryCheck": "Malzemeler Analiz Ediliyor...",
+    "loadingStepRecipeCrafting": "En Uygun Tarif Oluşturuluyor...",
     "defaultRequestError": "Tarifler üretilirken bir sorun oluştu."
   },
   "pantry": {
@@ -56,12 +59,19 @@
     },
     "emptyState": "Buzdolabı şu an boş.",
     "deleteProductAria": "{{name}} ürününü sil",
+    "decreaseQuantityAria": "{{name}} miktarını azalt",
+    "increaseQuantityAria": "{{name}} miktarını artır",
     "receipt": {
       "fabButton": "Fişten Ekle",
       "loadingMessage": "Fişiniz yapay zeka tarafından analiz ediliyor...",
       "networkError": "Sunucuya ulaşılamadı. Backend servisinin çalıştığını ve API adresini kontrol edin.",
       "defaultError": "Fiş analizi sırasında bir sorun oluştu.",
-      "successToast": "Süper! Fişteki ürünler buzdolabınıza eklendi."
+      "reviewTitle": "Fişten Tespit Edilen Ürünleri Kontrol Et",
+      "reviewDescription": "Eklemek istemediğin ürünü çıkarabilir veya adı/miktarı düzenleyebilirsin.",
+      "reviewValidationError": "En az bir geçerli ürün bırakıp tekrar deneyin.",
+      "cancelReviewButton": "İptal",
+      "confirmReviewButton": "Buzdolabına Ekle",
+      "successToast": "Süper! Onayladığınız fiş ürünleri buzdolabınıza eklendi."
     }
   },
   "recipes": {

@@ -5,6 +5,7 @@ const THEME_STORAGE_KEY = 'kapya-theme'
 const PROFILE_STORAGE_KEY = 'kapya-budget-profile'
 const ONBOARDING_STORAGE_KEY = 'kapya-onboarding-completed'
 const themeOptions = new Set(['light', 'dark'])
+const MAX_RECENT_RECIPE_NAMES = 15
 
 const budgetProfileOptions = [
   {
@@ -111,6 +112,8 @@ const persistOnboardingState = (value) => {
 
 const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
 
+const normalizeRecipeNameKey = (value) => normalize(value).replace(/\s+/g, ' ')
+
 const normalizeUnit = (value) => {
   const unit = normalize(value)
   if (!unit) {
@@ -132,7 +135,7 @@ const resolveShelfLifeDate = (firstDate, secondDate) => {
     return first
   }
 
-  return first < second ? first : second
+  return [first, second].sort((left, right) => left.localeCompare(right, 'tr'))[0]
 }
 
 const getMergeIndex = (products, targetProduct) =>
@@ -229,6 +232,7 @@ export const usePantryStore = create(
   currentTheme: getInitialTheme(),
   products: createDefaultProducts(),
   generatedRecipes: [],
+  recentRecipeNames: [],
   agentInsight: null,
   toastMessage: null,
 
@@ -282,11 +286,12 @@ export const usePantryStore = create(
     persistBudgetProfile(budgetProfileOptions[0].id)
     persistOnboardingState(false)
 
-    set((state) => ({
+    set(() => ({
       selectedBudgetProfile: budgetProfileOptions[0].id,
       hasCompletedOnboarding: false,
       products: createDefaultProducts(),
       generatedRecipes: [],
+      recentRecipeNames: [],
       agentInsight: null,
       toastMessage: {
         id: Date.now(),
@@ -360,6 +365,39 @@ export const usePantryStore = create(
   setGeneratedRecipes: (recipes) =>
     set({
       generatedRecipes: Array.isArray(recipes) ? recipes : [],
+    }),
+
+  addRecentRecipeNames: (recipeNames) =>
+    set((state) => {
+      const incomingNames = (Array.isArray(recipeNames) ? recipeNames : [])
+        .map((name) => String(name ?? '').trim())
+        .filter(Boolean)
+
+      if (incomingNames.length === 0) {
+        return state
+      }
+
+      const mergedNames = [...state.recentRecipeNames]
+      const seen = new Set(mergedNames.map((name) => normalizeRecipeNameKey(name)))
+
+      incomingNames.forEach((name) => {
+        const key = normalizeRecipeNameKey(name)
+        if (!key || seen.has(key)) {
+          return
+        }
+
+        mergedNames.push(name)
+        seen.add(key)
+      })
+
+      return {
+        recentRecipeNames: mergedNames.slice(-MAX_RECENT_RECIPE_NAMES),
+      }
+    }),
+
+  clearRecentRecipes: () =>
+    set({
+      recentRecipeNames: [],
     }),
 
   setAgentInsight: (insight) =>
@@ -449,6 +487,26 @@ export const usePantryStore = create(
         ),
       }
     }),
+
+  updateProductQuantity: ({ id, quantity }) =>
+    set((state) => {
+      const parsedQuantity = Number(quantity)
+      if (!id || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+        return state
+      }
+
+      return {
+        products: state.products.map((product) =>
+          product.id === id
+            ? {
+                ...product,
+                quantity: Number(parsedQuantity.toFixed(2)),
+                updatedAt: Date.now(),
+              }
+            : product,
+        ),
+      }
+    }),
 }),
     {
       name: 'kapya-pantry-store',
@@ -456,6 +514,7 @@ export const usePantryStore = create(
         selectedBudgetProfile: state.selectedBudgetProfile,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         products: state.products,
+        recentRecipeNames: state.recentRecipeNames,
       }),
     },
   ),

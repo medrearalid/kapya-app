@@ -30,9 +30,12 @@
     "noUrgentProducts": "Everything is fresh",
     "urgentProductItem": "{{name}} · {{quantity}} {{unit}} · {{days}} days left",
     "scanReceiptButton": "Scan Receipt",
-    "generateButton": "What Should I Eat Today?",
-    "generateButtonAssist": "Save Me From Waste / Generate Recipe",
+    "generateButton": "Generate Recipe",
+    "generateButtonUrgent": "Save From Waste",
     "loadingButton": "Generating recipes...",
+    "loadingStepChefThinking": "Chef is thinking...",
+    "loadingStepInventoryCheck": "Analyzing ingredients...",
+    "loadingStepRecipeCrafting": "Crafting the best recipe...",
     "defaultRequestError": "Something went wrong while generating recipes."
   },
   "pantry": {
@@ -56,12 +59,19 @@
     },
     "emptyState": "Your fridge is empty right now.",
     "deleteProductAria": "Delete {{name}}",
+    "decreaseQuantityAria": "Decrease quantity of {{name}}",
+    "increaseQuantityAria": "Increase quantity of {{name}}",
     "receipt": {
       "fabButton": "Add from Receipt",
       "loadingMessage": "Analyzing your receipt with AI...",
       "networkError": "Unable to reach the server. Check that backend is running and API URL is correct.",
       "defaultError": "A problem occurred while analyzing the receipt.",
-      "successToast": "Great! Receipt items were added to your fridge."
+      "reviewTitle": "Review Items Found From Receipt",
+      "reviewDescription": "You can remove incorrect rows or edit item name and quantity before saving.",
+      "reviewValidationError": "Keep at least one valid item and try again.",
+      "cancelReviewButton": "Cancel",
+      "confirmReviewButton": "Add to Fridge",
+      "successToast": "Great! Approved receipt items were added to your fridge."
     }
   },
   "recipes": {
