@@ -51,6 +51,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
     const focusedIngredients = request.body?.focusedIngredients
     const preferences = request.body?.preferences
     const isLucky = request.body?.isLucky === true
+    const mealType = String(request.body?.mealType ?? '').trim().toLowerCase()
 
     if (pantryStock !== undefined && !Array.isArray(pantryStock)) {
       return response.status(400).json({
@@ -73,9 +74,17 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       })
     }
 
+    if (mealType && !['kahvalti', 'ogle', 'aksam'].includes(mealType)) {
+      return response.status(400).json({
+        success: false,
+        error: 'Gecersiz istek govdesi. mealType alani kahvalti, ogle veya aksam olmalidir.',
+      })
+    }
+
     const hasAnySmartCriteria =
       Boolean(mealName) ||
       isLucky ||
+      Boolean(mealType) ||
       (Array.isArray(focusedIngredients) && focusedIngredients.length > 0) ||
       (Array.isArray(preferences) && preferences.length > 0)
 
@@ -83,7 +92,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       return response.status(400).json({
         success: false,
         error:
-          'Gecersiz istek govdesi. mealName, isLucky, focusedIngredients veya preferences alanlarindan en az biri zorunludur.',
+          'Gecersiz istek govdesi. mealName, mealType, isLucky, focusedIngredients veya preferences alanlarindan en az biri zorunludur.',
       })
     }
 
@@ -93,6 +102,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       focusedIngredients,
       preferences,
       isLucky,
+      mealType,
     })
 
     return response.status(200).json({

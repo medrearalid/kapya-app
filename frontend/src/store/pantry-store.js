@@ -33,6 +33,25 @@ export const KATEGORI_OPTIONS = [
   'Diğer',
 ]
 
+const DEFAULT_SHELF_LIFE_DAYS = 7
+const PRODUCT_STATUS_ACTIVE = 'active'
+const PRODUCT_STATUS_DEPLETED = 'tukendi'
+const FINANCE_DEFAULT_STATE = Object.freeze({
+  monthlyKitchenSpend: {},
+  monthlyPreventedWaste: {},
+})
+
+const CATEGORY_SHELF_LIFE_DAYS = Object.freeze({
+  Sebzeler: 5,
+  Meyveler: 6,
+  'Et ve Tavuk': 3,
+  'Süt Ürünleri': 7,
+  Baharatlar: 365,
+  Atıştırmalıklar: 120,
+  'Temel Gıda': 180,
+  'Diğer': 14,
+})
+
 export const productUnitOptions = [
   'adet',
   'gram',
@@ -49,6 +68,45 @@ const daysFromNow = (days) => {
 const toPositiveNumber = (value, fallbackValue = 1) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackValue
+}
+
+const toCurrencyNumber = (value, fallbackValue = 0) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallbackValue
+  }
+
+  return Number(parsed.toFixed(2))
+}
+
+const getCurrentMonthKey = () => new Date().toISOString().slice(0, 7)
+
+const increaseMonthlyAmount = (monthMap, monthKey, amount) => ({
+  ...(monthMap && typeof monthMap === 'object' ? monthMap : {}),
+  [monthKey]: toCurrencyNumber(
+    Number(monthMap?.[monthKey] || 0) + Math.max(0, Number(amount) || 0),
+    0,
+  ),
+})
+
+const normalizeFinancialMap = (value) => {
+  const entries = Object.entries(value && typeof value === 'object' ? value : {})
+  return entries.reduce((accumulator, [key, amount]) => {
+    accumulator[String(key)] = toCurrencyNumber(amount, 0)
+    return accumulator
+  }, {})
+}
+
+const getShelfLifeDaysByCategory = (kategori) =>
+  CATEGORY_SHELF_LIFE_DAYS[kategori] ?? DEFAULT_SHELF_LIFE_DAYS
+
+const resolveShelfLifeDays = (value, kategori) => {
+  const parsed = Number(value)
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.round(parsed)
+  }
+
+  return getShelfLifeDaysByCategory(kategori)
 }
 
 const getSystemTheme = () => {
@@ -162,6 +220,7 @@ const mergeIncomingProduct = (products, incomingProduct) => {
       {
         ...incomingProduct,
         id: createProductId(),
+        status: PRODUCT_STATUS_ACTIVE,
         addedAt: now,
         updatedAt: now,
       },
@@ -171,19 +230,52 @@ const mergeIncomingProduct = (products, incomingProduct) => {
 
   const nextProducts = [...products]
   const existingProduct = nextProducts[existingIndex]
+  const existingQuantity = toPositiveNumber(existingProduct.quantity, 0)
+  const incomingQuantity = toPositiveNumber(incomingProduct.quantity, 0)
+  const existingUnitCost = toCurrencyNumber(existingProduct?.birimMaliyet, 0)
+  const incomingUnitCost = toCurrencyNumber(incomingProduct?.birimMaliyet, 0)
+
+  let resolvedIncomingUnitCost = Math.max(0, incomingUnitCost)
+  if (resolvedIncomingUnitCost <= 0 && existingUnitCost > 0) {
+    resolvedIncomingUnitCost = existingUnitCost
+  }
+  const existingStockValue = toCurrencyNumber(
+    existingProduct?.fiyat,
+    existingUnitCost > 0 ? existingUnitCost * existingQuantity : 0,
+  )
+  const incomingStockValue = toCurrencyNumber(
+    incomingProduct?.fiyat,
+    resolvedIncomingUnitCost > 0 ? resolvedIncomingUnitCost * incomingQuantity : 0,
+  )
+
   const mergedQuantity = Number(
     (
       toPositiveNumber(existingProduct.quantity, 0) +
       toPositiveNumber(incomingProduct.quantity, 0)
     ).toFixed(2),
   )
+  const mergedStockValue = toCurrencyNumber(existingStockValue + incomingStockValue, 0)
+  const mergedUnitCost = mergedQuantity > 0 ? toCurrencyNumber(mergedStockValue / mergedQuantity, 0) : 0
 
   nextProducts[existingIndex] = {
     ...existingProduct,
     quantity: mergedQuantity,
+    status: PRODUCT_STATUS_ACTIVE,
+    fiyat: mergedStockValue,
+    birimMaliyet: mergedUnitCost,
     estimatedShelfLifeEndDate: resolveShelfLifeDate(
       existingProduct.estimatedShelfLifeEndDate,
       incomingProduct.estimatedShelfLifeEndDate,
+    ),
+    rafOmruGun: Math.min(
+      toPositiveNumber(
+        existingProduct.rafOmruGun,
+        getShelfLifeDaysByCategory(existingProduct.kategori),
+      ),
+      toPositiveNumber(
+        incomingProduct.rafOmruGun,
+        getShelfLifeDaysByCategory(incomingProduct.kategori),
+      ),
     ),
     updatedAt: now,
   }
@@ -205,13 +297,45 @@ const createProductId = () => {
   return `product-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+const normalizeProductStatus = (status, quantity) => {
+  if (Number(quantity) <= 0) {
+    return PRODUCT_STATUS_DEPLETED
+  }
+
+  return String(status ?? '').trim() === PRODUCT_STATUS_DEPLETED
+    ? PRODUCT_STATUS_DEPLETED
+    : PRODUCT_STATUS_ACTIVE
+}
+
+const normalizeStoredProduct = (product) => {
+  const quantity = Number(product?.quantity)
+  const normalizedQuantity = Number.isFinite(quantity) ? Number(quantity.toFixed(2)) : 0
+  const birimMaliyet = toCurrencyNumber(product?.birimMaliyet, 0)
+  const fiyat = toCurrencyNumber(
+    product?.fiyat,
+    birimMaliyet > 0 ? birimMaliyet * Math.max(0, normalizedQuantity) : 0,
+  )
+
+  return {
+    ...product,
+    quantity: Math.max(0, normalizedQuantity),
+    status: normalizeProductStatus(product?.status, normalizedQuantity),
+    birimMaliyet,
+    fiyat,
+  }
+}
+
 const createDefaultProducts = () => [
   {
     id: createProductId(),
     name: 'Makarna',
     quantity: 2,
+    status: PRODUCT_STATUS_ACTIVE,
+    fiyat: 70,
+    birimMaliyet: 35,
     unit: 'paket',
     kategori: 'Temel Gıda',
+    rafOmruGun: getShelfLifeDaysByCategory('Temel Gıda'),
     estimatedShelfLifeEndDate: daysFromNow(180),
     addedAt: Date.now(),
     updatedAt: Date.now(),
@@ -220,8 +344,12 @@ const createDefaultProducts = () => [
     id: createProductId(),
     name: 'Yumurta',
     quantity: 10,
+    status: PRODUCT_STATUS_ACTIVE,
+    fiyat: 45,
+    birimMaliyet: 4.5,
     unit: 'adet',
     kategori: 'Temel Gıda',
+    rafOmruGun: getShelfLifeDaysByCategory('Temel Gıda'),
     estimatedShelfLifeEndDate: daysFromNow(9),
     addedAt: Date.now(),
     updatedAt: Date.now(),
@@ -241,6 +369,9 @@ export const usePantryStore = create(
   hasCompletedOnboarding: getSavedOnboardingState(),
   currentTheme: getInitialTheme(),
   products: createDefaultProducts(),
+  finance: {
+    ...FINANCE_DEFAULT_STATE,
+  },
   generatedRecipes: [],
   recentRecipeNames: [],
   agentInsight: null,
@@ -300,6 +431,9 @@ export const usePantryStore = create(
       selectedBudgetProfile: budgetProfileOptions[0].id,
       hasCompletedOnboarding: false,
       products: createDefaultProducts(),
+      finance: {
+        ...FINANCE_DEFAULT_STATE,
+      },
       generatedRecipes: [],
       recentRecipeNames: [],
       agentInsight: null,
@@ -320,18 +454,25 @@ export const usePantryStore = create(
       const parsedQuantity = Number(productInput?.quantity)
       const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1
       const unit = normalizeUnit(productInput?.unit ?? 'adet')
-      const estimatedShelfLifeEndDate =
-        String(productInput?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(7)
       const kategori = KATEGORI_OPTIONS.includes(productInput?.kategori)
         ? productInput.kategori
         : 'Diğer'
+      const rafOmruGun = resolveShelfLifeDays(
+        productInput?.rafOmruGun ?? productInput?.estimatedShelfLifeDays,
+        kategori,
+      )
+      const estimatedShelfLifeEndDate =
+        String(productInput?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(rafOmruGun)
 
       const incomingProduct = {
         name,
         quantity,
         unit,
+        fiyat: toCurrencyNumber(productInput?.fiyat ?? productInput?.price, 0),
+        birimMaliyet: toCurrencyNumber(productInput?.birimMaliyet ?? productInput?.unitCost, 0),
         estimatedShelfLifeEndDate,
         kategori,
+        rafOmruGun,
       }
 
       return {
@@ -339,7 +480,7 @@ export const usePantryStore = create(
       }
     }),
 
-  addProductsBatch: (productList) =>
+  addProductsBatch: (productList, options = {}) =>
     set((state) => {
       const normalizedProducts = (Array.isArray(productList) ? productList : [])
         .map((item) => {
@@ -350,15 +491,27 @@ export const usePantryStore = create(
 
           const quantity = toPositiveNumber(item?.quantity, 1)
           const unit = normalizeUnit(item?.unit ?? 'adet')
-          const shelfLifeDays = toPositiveNumber(item?.estimatedShelfLifeDays, 7)
           const kategori = KATEGORI_OPTIONS.includes(item?.kategori) ? item.kategori : 'Diğer'
+          const rafOmruGun = resolveShelfLifeDays(
+            item?.estimatedShelfLifeDays ?? item?.rafOmruGun,
+            kategori,
+          )
+          const estimatedShelfLifeEndDate =
+            String(item?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(rafOmruGun)
+          const fiyat = toCurrencyNumber(item?.fiyat ?? item?.price, 0)
+          const birimMaliyet =
+            toCurrencyNumber(item?.birimMaliyet ?? item?.unitCost, 0) ||
+            (quantity > 0 && fiyat > 0 ? toCurrencyNumber(fiyat / quantity, 0) : 0)
 
           return {
             name,
             quantity,
             unit,
-            estimatedShelfLifeEndDate: daysFromNow(Math.round(shelfLifeDays)),
+            fiyat,
+            birimMaliyet,
+            estimatedShelfLifeEndDate,
             kategori,
+            rafOmruGun,
           }
         })
         .filter(Boolean)
@@ -373,8 +526,21 @@ export const usePantryStore = create(
         state.products,
       )
 
+      const monthKey = getCurrentMonthKey()
+      const isReceiptSource = String(options?.source ?? '').trim() === 'receipt'
+      const receiptSpend = isReceiptSource
+        ? normalizedProducts.reduce((sum, item) => sum + toCurrencyNumber(item?.fiyat, 0), 0)
+        : 0
+
       return {
         products: mergedProducts,
+        finance: {
+          ...state.finance,
+          monthlyKitchenSpend:
+            receiptSpend > 0
+              ? increaseMonthlyAmount(state.finance?.monthlyKitchenSpend, monthKey, receiptSpend)
+              : state.finance?.monthlyKitchenSpend || {},
+        },
       }
     }),
 
@@ -437,6 +603,7 @@ export const usePantryStore = create(
     set((state) => {
       const multiplier = Math.max(1, Number(portionSize) || 1)
       const usageByName = new Map()
+      let preventedWasteAmount = 0
 
       ;(Array.isArray(ingredients) ? ingredients : [])
         .map(normalizeIngredient)
@@ -447,33 +614,53 @@ export const usePantryStore = create(
           usageByName.set(key, currentAmount + ingredient.baseAmount * multiplier)
         })
 
-      const updatedProducts = state.products.flatMap((product) => {
+      const updatedProducts = state.products.map((product) => {
         const neededAmount = usageByName.get(normalize(product.name)) || 0
         if (neededAmount <= 0) {
-          return [product]
+          return product
         }
 
         const currentQuantity = Number(product.quantity)
+        const unitCost =
+          toCurrencyNumber(product?.birimMaliyet, 0) ||
+          (currentQuantity > 0 ? toCurrencyNumber(Number(product?.fiyat || 0) / currentQuantity, 0) : 0)
+        const consumedQuantity = Math.min(
+          Math.max(0, Number.isFinite(currentQuantity) ? currentQuantity : 0),
+          Math.max(0, neededAmount),
+        )
+
+        preventedWasteAmount += consumedQuantity * unitCost
+
         const remainingQuantity =
           Number.isFinite(currentQuantity) && currentQuantity > 0
             ? Number((currentQuantity - neededAmount).toFixed(2))
             : 0
 
-        if (remainingQuantity <= 0) {
-          return []
-        }
+        const safeRemainingQuantity = Math.max(0, remainingQuantity)
+        const remainingStockValue = toCurrencyNumber(safeRemainingQuantity * unitCost, 0)
 
-        return [
-          {
-            ...product,
-            quantity: remainingQuantity,
-            updatedAt: Date.now(),
-          },
-        ]
+        return {
+          ...product,
+          quantity: safeRemainingQuantity,
+          fiyat: remainingStockValue,
+          birimMaliyet: unitCost,
+          status: remainingQuantity > 0 ? PRODUCT_STATUS_ACTIVE : PRODUCT_STATUS_DEPLETED,
+          updatedAt: Date.now(),
+        }
       })
+
+      const monthKey = getCurrentMonthKey()
 
       return {
         products: updatedProducts,
+        finance: {
+          ...state.finance,
+          monthlyPreventedWaste: increaseMonthlyAmount(
+            state.finance?.monthlyPreventedWaste,
+            monthKey,
+            preventedWasteAmount,
+          ),
+        },
       }
     }),
 
@@ -507,16 +694,20 @@ export const usePantryStore = create(
   updateProductQuantity: ({ id, quantity }) =>
     set((state) => {
       const parsedQuantity = Number(quantity)
-      if (!id || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      if (!id || !Number.isFinite(parsedQuantity)) {
         return state
       }
+
+      const safeQuantity = parsedQuantity > 0 ? Number(parsedQuantity.toFixed(2)) : 0
 
       return {
         products: state.products.map((product) =>
           product.id === id
             ? {
                 ...product,
-                quantity: Number(parsedQuantity.toFixed(2)),
+                quantity: safeQuantity,
+                fiyat: toCurrencyNumber(safeQuantity * toCurrencyNumber(product?.birimMaliyet, 0), 0),
+                status: safeQuantity > 0 ? PRODUCT_STATUS_ACTIVE : PRODUCT_STATUS_DEPLETED,
                 updatedAt: Date.now(),
               }
             : product,
@@ -531,7 +722,33 @@ export const usePantryStore = create(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         products: state.products,
         recentRecipeNames: state.recentRecipeNames,
+        finance: state.finance,
       }),
+      merge: (persistedState, currentState) => {
+        const mergedState = {
+          ...currentState,
+          ...persistedState,
+        }
+
+        return {
+          ...mergedState,
+          products: (Array.isArray(mergedState?.products) ? mergedState.products : [])
+            .map(normalizeStoredProduct)
+            .sort((left, right) => {
+              const leftDepleted = left.status === PRODUCT_STATUS_DEPLETED
+              const rightDepleted = right.status === PRODUCT_STATUS_DEPLETED
+              if (leftDepleted !== rightDepleted) {
+                return leftDepleted ? 1 : -1
+              }
+
+              return String(left.name ?? '').localeCompare(String(right.name ?? ''), 'tr')
+            }),
+          finance: {
+            monthlyKitchenSpend: normalizeFinancialMap(mergedState?.finance?.monthlyKitchenSpend),
+            monthlyPreventedWaste: normalizeFinancialMap(mergedState?.finance?.monthlyPreventedWaste),
+          },
+        }
+      },
     },
   ),
 )

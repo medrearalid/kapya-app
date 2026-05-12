@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 const PLANNER_STORAGE_KEY = 'kapya-planner-store'
 
-const mealTypeOptions = new Set(['ogle', 'aksam'])
+const mealTypeOptions = new Set(['kahvalti', 'ogle', 'aksam'])
 
 const createMealId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -98,6 +98,14 @@ const normalizePlannedMeal = (plannedMeal) => {
   }
 }
 
+const upsertMealBySlot = (plannedMeals, incomingMeal) => {
+  const filtered = plannedMeals.filter(
+    (meal) => !(meal.date === incomingMeal.date && meal.mealType === incomingMeal.mealType),
+  )
+
+  return [incomingMeal, ...filtered]
+}
+
 export const usePlannerStore = create(
   persist(
     (set) => ({
@@ -121,7 +129,7 @@ export const usePlannerStore = create(
           }
 
           return {
-            plannedMeals: [normalizedMeal, ...state.plannedMeals],
+            plannedMeals: upsertMealBySlot(state.plannedMeals, normalizedMeal),
           }
         }),
 

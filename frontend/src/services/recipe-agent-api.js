@@ -44,6 +44,7 @@ export const generateRecipeByName = async ({
   focusedIngredients,
   preferences,
   isLucky,
+  mealType,
 }) => {
   const payload = {
     mealName: String(mealName ?? '').trim(),
@@ -63,6 +64,11 @@ export const generateRecipeByName = async ({
 
   if (isLucky === true) {
     payload.isLucky = true
+  }
+
+  const normalizedMealType = String(mealType ?? '').trim()
+  if (normalizedMealType) {
+    payload.mealType = normalizedMealType
   }
 
   const response = await fetch(buildApiUrl('/api/ai/recipes/by-name'), {

@@ -54,6 +54,7 @@ const sanitizeProduct = (product) => ({
   name: String(product?.name ?? product?.urunAdi ?? '').trim(),
   quantity: Number(product?.quantity ?? product?.miktar ?? 0),
   unit: String(product?.unit ?? product?.birim ?? 'adet').trim() || 'adet',
+  birimMaliyet: Number(product?.birimMaliyet ?? product?.unitCost ?? 0),
 })
 
 const sanitizeProductList = (products) =>
@@ -143,6 +144,134 @@ const normalizeIngredient = (ingredient) => {
 
 const sanitizeIngredientList = (ingredients) =>
   (Array.isArray(ingredients) ? ingredients : []).map(normalizeIngredient).filter(Boolean)
+
+const MARKET_FALLBACK_UNIT_COST_BY_UNIT = Object.freeze({
+  gram: 0.09,
+  adet: 8.5,
+  paket: 32,
+  litre: 58,
+  ml: 0.06,
+  var: 6,
+  default: 10,
+})
+
+const normalizeCostUnit = (value) => {
+  const unit = normalizeText(value)
+  if (['gram', 'gr'].includes(unit)) return 'gram'
+  if (['adet', 'ad', 'tane'].includes(unit)) return 'adet'
+  if (['paket', 'pkt', 'pk'].includes(unit)) return 'paket'
+  if (['litre', 'lt', 'l'].includes(unit)) return 'litre'
+  if (['ml', 'mililitre'].includes(unit)) return 'ml'
+  if (['var', 'mevcut'].includes(unit)) return 'var'
+  return ''
+}
+
+const parseAmountTextToNumber = (value) => {
+  const text = String(value ?? '').trim().replaceAll(',', '.')
+  if (!text) {
+    return 1
+  }
+
+  const direct = Number(text)
+  if (Number.isFinite(direct) && direct > 0) {
+    return direct
+  }
+
+  const fractionMatch = /([\d.]+)\s*\/\s*([\d.]+)/.exec(text)
+  if (fractionMatch) {
+    const numerator = Number(fractionMatch[1])
+    const denominator = Number(fractionMatch[2])
+    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0) {
+      return numerator / denominator
+    }
+  }
+
+  const numericPrefix = Number.parseFloat(text)
+  return Number.isFinite(numericPrefix) && numericPrefix > 0 ? numericPrefix : 1
+}
+
+const convertUnitCost = ({ unitCost, fromUnit, toUnit }) => {
+  if (fromUnit === toUnit) {
+    return unitCost
+  }
+
+  if (fromUnit === 'litre' && toUnit === 'ml') {
+    return unitCost / 1000
+  }
+
+  if (fromUnit === 'ml' && toUnit === 'litre') {
+    return unitCost * 1000
+  }
+
+  return 0
+}
+
+const resolvePantryUnitCost = ({ ingredientName, ingredientUnit, pantryStock }) => {
+  const normalizedIngredientName = normalizeText(ingredientName)
+  const normalizedIngredientUnit = normalizeCostUnit(ingredientUnit)
+  if (!normalizedIngredientName) {
+    return 0
+  }
+
+  const candidate = sanitizeProductList(pantryStock).find((item) => {
+    const pantryName = normalizeText(item.name)
+    if (!pantryName) {
+      return false
+    }
+
+    return (
+      pantryName === normalizedIngredientName ||
+      pantryName.includes(normalizedIngredientName) ||
+      normalizedIngredientName.includes(pantryName)
+    )
+  })
+
+  if (!candidate) {
+    return 0
+  }
+
+  const rawUnitCost = Number(candidate?.birimMaliyet ?? candidate?.unitCost ?? 0)
+  if (!Number.isFinite(rawUnitCost) || rawUnitCost <= 0) {
+    return 0
+  }
+
+  const pantryUnit = normalizeCostUnit(candidate?.unit)
+  if (!normalizedIngredientUnit || !pantryUnit) {
+    return rawUnitCost
+  }
+
+  return convertUnitCost({
+    unitCost: rawUnitCost,
+    fromUnit: pantryUnit,
+    toUnit: normalizedIngredientUnit,
+  })
+}
+
+const resolveFallbackUnitCost = (unit) => {
+  const normalizedUnit = normalizeCostUnit(unit)
+  return MARKET_FALLBACK_UNIT_COST_BY_UNIT[normalizedUnit] ?? MARKET_FALLBACK_UNIT_COST_BY_UNIT.default
+}
+
+const calculateRecipePortionCostTl = ({ matchedIngredients, missingIngredients, pantryStock }) => {
+  const allIngredients = [
+    ...(Array.isArray(matchedIngredients) ? matchedIngredients : []),
+    ...(Array.isArray(missingIngredients) ? missingIngredients : []),
+  ]
+
+  const totalCost = allIngredients.reduce((sum, ingredient) => {
+    const amount = parseAmountTextToNumber(ingredient?.miktar)
+    const pantryUnitCost = resolvePantryUnitCost({
+      ingredientName: ingredient?.isim,
+      ingredientUnit: ingredient?.birim,
+      pantryStock,
+    })
+    const unitCost = pantryUnitCost > 0 ? pantryUnitCost : resolveFallbackUnitCost(ingredient?.birim)
+
+    return sum + amount * unitCost
+  }, 0)
+
+  return Number(totalCost.toFixed(2))
+}
 
 const buildPantryNameSet = (pantryStock) =>
   new Set(
@@ -334,17 +463,28 @@ const PREFERENCE_PROMPT_RULES = {
   'one-pot': 'Tarif tek tencere veya tek tava ile tamamlanmali.',
 }
 
+const MEAL_TYPE_PROMPT_RULES = {
+  kahvalti:
+    'OGUN TIPI KAHVALTI: Tarif yalnizca kahvaltiya uygun olmali. Menemen, omlet, yulaf, pankek, tost gibi kahvalti formatlarina sadik kal. Kurufasulye, etli tencere, agir aksam yemekleri asla onerme.',
+  ogle:
+    'OGUN TIPI OGLE: Tarif dengeli ve gun ortasina uygun olmali. Hafif-orta doyuruculukta, pratik veya ofise uygun formatlari onceliklendir.',
+  aksam:
+    'OGUN TIPI AKSAM: Tarif aksam yemegine uygun olmali. Tencere, firin, izgara veya doyurucu tabaklar tercih et. Kahvalti tabagi formati asla onerme.',
+}
+
 const buildGenerateRecipeByNamePrompt = ({
   mealName,
   pantryStock,
   focusedIngredients,
   preferences,
   isLucky,
+  mealType,
 }) => {
   const normalizedMealName = String(mealName ?? '').trim()
   const normalizedPantryStock = sanitizeProductList(pantryStock)
   const normalizedFocusedIngredients = sanitizeStringList(focusedIngredients)
   const normalizedPreferences = sanitizeStringList(preferences)
+  const normalizedMealType = String(mealType ?? '').trim().toLocaleLowerCase('tr-TR')
 
   const dynamicInstructions = []
 
@@ -371,6 +511,10 @@ const buildGenerateRecipeByNamePrompt = ({
     }
   }
 
+  if (MEAL_TYPE_PROMPT_RULES[normalizedMealType]) {
+    dynamicInstructions.push(MEAL_TYPE_PROMPT_RULES[normalizedMealType])
+  }
+
   if (normalizedMealName) {
     dynamicInstructions.push(`Kullanicinin hizli arama ifadesi: ${normalizedMealName}`)
   } else {
@@ -379,6 +523,7 @@ const buildGenerateRecipeByNamePrompt = ({
 
   const payload = {
     mealName: normalizedMealName || null,
+    mealType: normalizedMealType || null,
     pantryStock: normalizedPantryStock,
     focusedIngredients: normalizedFocusedIngredients,
     preferences: normalizedPreferences,
@@ -399,6 +544,7 @@ const buildGenerateRecipeByNamePrompt = ({
     '5) matchedIngredients en az 4 adet olmali.',
     '6) missingIngredients 0-4 adet olabilir.',
     '7) Tarif pratik ama geleneksel teknige sadik olmali ve verilen kisitlarla celismemeli.',
+    '8) mealType verildiyse o ogun tipine KESINLIKLE uy; uygunsuz ogun onermesi yasak.',
     '',
     ...dynamicInstructions,
     '',
@@ -413,6 +559,7 @@ const GenerateRecipeByNameTool = async ({
   focusedIngredients,
   preferences,
   isLucky,
+  mealType,
 }) => {
   const llmResponse = await llm.invoke(
     buildGenerateRecipeByNamePrompt({
@@ -421,6 +568,7 @@ const GenerateRecipeByNameTool = async ({
       focusedIngredients,
       preferences,
       isLucky,
+      mealType,
     }),
   )
 
@@ -736,6 +884,11 @@ const normalizeGeneratedRecipe = ({ recipe, pantryStock }) => {
             'Adim 2: Ana malzemeleri kontrollu sekilde pisirin.',
             `Adim 3: ${recipeName} icin baharat dengesini kurun ve sicak servis edin.`,
           ],
+    porsiyonMaliyetiTl: calculateRecipePortionCostTl({
+      matchedIngredients,
+      missingIngredients,
+      pantryStock,
+    }),
   }
 }
 
@@ -931,6 +1084,11 @@ const normalizeNamedRecipe = ({
             'Adim 5: Kivami kontrol edip gerekirse kisa sure dinlendir.',
             'Adim 6: Sicak servis ederek son dokunusu yap.',
           ],
+    porsiyonMaliyetiTl: calculateRecipePortionCostTl({
+      matchedIngredients,
+      missingIngredients,
+      pantryStock,
+    }),
     goruntuUrl: String(recipe?.goruntuUrl ?? '').trim() || buildInlinePlaceholderImage(recipeName),
   }
 }
@@ -996,6 +1154,13 @@ export const executeKapyaAgent = async ({
 
   const enrichedRecipe = {
     ...selectedRecipe,
+    porsiyonMaliyetiTl:
+      Number(selectedRecipe?.porsiyonMaliyetiTl) ||
+      calculateRecipePortionCostTl({
+        matchedIngredients: selectedRecipe?.matchedIngredients,
+        missingIngredients: selectedRecipe?.missingIngredients,
+        pantryStock: combinedStock,
+      }),
     goruntuUrl: await NanoBananaImageTool({
       llm,
       mealNameTr: selectedRecipe.tarifAdi,
@@ -1014,11 +1179,13 @@ export const executeRecipeByNameAgent = async ({
   focusedIngredients,
   preferences,
   isLucky,
+  mealType,
 }) => {
   const normalizedMealName = String(mealName ?? '').trim()
   const normalizedPantryStock = sanitizeProductList(pantryStock)
   const normalizedFocusedIngredients = sanitizeStringList(focusedIngredients)
   const normalizedPreferences = sanitizeStringList(preferences)
+  const normalizedMealType = String(mealType ?? '').trim().toLocaleLowerCase('tr-TR')
   const luckyMode = isLucky === true
 
   if (
@@ -1039,6 +1206,7 @@ export const executeRecipeByNameAgent = async ({
     focusedIngredients: normalizedFocusedIngredients,
     preferences: normalizedPreferences,
     isLucky: luckyMode,
+    mealType: normalizedMealType,
   }).catch(() => null)
 
   const rawRecipe = generated?.tarif && typeof generated.tarif === 'object' ? generated.tarif : generated

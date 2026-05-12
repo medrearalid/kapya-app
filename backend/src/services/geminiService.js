@@ -100,10 +100,11 @@ const receiptResponseJsonSchema = {
       name: { type: 'string' },
       quantity: { type: 'number' },
       unit: { type: 'string' },
+      price: { type: 'number' },
       estimatedShelfLifeDays: { type: 'number' },
       kategori: { type: 'string' },
     },
-    required: ['name', 'quantity', 'unit', 'estimatedShelfLifeDays', 'kategori'],
+    required: ['name', 'quantity', 'unit', 'price', 'estimatedShelfLifeDays', 'kategori'],
   },
 }
 
@@ -281,6 +282,7 @@ const parseReceiptJsonResponse = (rawText) => {
       name: String(item?.name ?? item?.isim ?? '').trim(),
       quantity: Number(item?.quantity ?? item?.miktar ?? 0),
       unit: normalizeReceiptUnit(item?.unit ?? item?.birim),
+      price: Number(item?.price ?? item?.fiyat ?? 0),
       estimatedShelfLifeDays: Number(
         item?.estimatedShelfLifeDays ?? item?.tahminiRafOmruGun ?? 0,
       ),
@@ -304,6 +306,8 @@ const parseReceiptJsonResponse = (rawText) => {
         RECEIPT_ALLOWED_UNITS.has(item.unit) &&
         Number.isFinite(item.quantity) &&
         item.quantity > 0 &&
+        Number.isFinite(item.price) &&
+        item.price > 0 &&
         Number.isFinite(item.estimatedShelfLifeDays) &&
         item.estimatedShelfLifeDays > 0,
     )
@@ -416,12 +420,13 @@ export const analyzeReceiptImage = async ({ imageBase64 }) => {
     'Hazir tuketime uygun urunleri ASLA ekleme (ornek: yas pasta, tatli, sandvic, hazir yemek).',
     'Gida disi urunleri ASLA ekleme (ornek: bardak, tabak, mutfak esyasi, temizlik urunu).',
     'Emin degilsen urunu hic ekleme.',
-    'Her urun icin su alanlari dondur: name, quantity, unit, estimatedShelfLifeDays, kategori.',
+    'Her urun icin su alanlari dondur: name, quantity, unit, price, estimatedShelfLifeDays, kategori.',
     'KURAL 1 - URUN ADI: Fisteki tum kisaltmalari ve kodlari duzelterek temiz Turkce ile Türkçe karakter kullanarak yaz; sadece ilk harfi buyuk olsun (Ornek: "DMT 1KG"->"Domates", "YMR"->"Yumurta", "ZYT YAG 0.75L"->"Zeytinyagi").',
-    'KURAL 2 - BIRIM: Stoktan düşme hesabını doğru yapabilmek için; hassas birimler kullan (Ornek: 1.5 kg->1500 gram, 1 litre->1000 ml). Kabul edilen birimler: adet, gram, paket, ml, mevcut.',
+    'KURAL 2 - BIRIM: Stoktan düşme hesabını doğru yapabilmek için; hassas birimler kullan (Ornek: 1.5 kg->1500 gram). Kabul edilen birimler: adet, gram, paket, litre, mevcut.',
     'KURAL 3 - BAHARAT: Baharat turundeki her urun (tuz, karabiber, kimyon, pul biber vs.) icin quantity=1 ve unit="var" kullan.',
     'KURAL 4 - KATEGORI: Her urune su kategorilerden birini ata: Sebzeler, Meyveler, Et ve Tavuk, Sut Urunleri, Baharatlar, Atistirmaliklar, Temel Gida, Diger.',
-    'KURAL 5: estimatedShelfLifeDays pozitif sayi olsun.',
+    'KURAL 5 - FIYAT: Fisteki satir toplam fiyatini TL cinsinden numeric olarak KESINLIKLE ekle (price > 0).',
+    'KURAL 6: estimatedShelfLifeDays pozitif sayi olsun.',
     'Sonucu sadece JSON dizisi olarak dondur.',
   ].join(' ')
 

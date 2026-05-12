@@ -44,6 +44,15 @@ function RecipeDetailPage() {
   )
 
   const plannerRecipe = useMemo(() => toPlannerRecipe(recipe), [recipe])
+  const formattedPortionCost = useMemo(
+    () =>
+      new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY',
+        maximumFractionDigits: 2,
+      }).format(Math.max(0, Number(recipe?.porsiyonMaliyetiTl) || 0)),
+    [recipe?.porsiyonMaliyetiTl],
+  )
   const hasSmartChefEntryAnimation = Boolean(location.state?.fromChefHub)
 
   if (!recipe) {
@@ -180,6 +189,10 @@ function RecipeDetailPage() {
           <Users className="h-3.5 w-3.5" aria-hidden="true" />
           {recipe.porsiyon}
         </div>
+
+        <p className="mt-3 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+          {t('recipes.portionCostLabel')}: {formattedPortionCost}
+        </p>
       </article>
 
       <article className="glass-panel soft-card rounded-2xl p-4">
@@ -298,6 +311,7 @@ function RecipeDetailPage() {
           dayLabel: t('planner.dayLabel'),
           mealTypeLabel: t('planner.mealTypeLabel'),
           portionLabel: t('planner.portionLabel'),
+          breakfast: t('planner.breakfast'),
           lunch: t('planner.lunch'),
           dinner: t('planner.dinner'),
           cancelButton: t('planner.cancelButton'),

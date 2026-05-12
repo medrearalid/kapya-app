@@ -10,6 +10,7 @@ import PlannerPage from './pages/planner-page'
 import RecipeDetailPage from './pages/recipe-detail-page'
 import RecipePage from './pages/recipe-page'
 import SettingsPage from './pages/settings-page'
+import WalletPage from './pages/wallet-page'
 
 const router = createBrowserRouter([
   {
@@ -40,6 +41,10 @@ const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SettingsPage />,
+      },
+      {
+        path: 'wallet',
+        element: <WalletPage />,
       },
     ],
   },

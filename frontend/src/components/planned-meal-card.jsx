@@ -1,13 +1,35 @@
 import { CalendarCheck2, Check, Trash2 } from 'lucide-react'
 import PropTypes from 'prop-types'
+import { motion, useAnimation } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import TapButton from './tap-button'
 
 function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
   const { t } = useTranslation()
+  const swipeControls = useAnimation()
+
+  const handleDragEnd = async (_event, info) => {
+    const swipeDistance = Math.abs(Number(info?.offset?.x) || 0)
+    if (swipeDistance >= 110) {
+      await swipeControls.start({
+        x: info.offset.x > 0 ? 380 : -380,
+        opacity: 0,
+        transition: { duration: 0.18, ease: 'easeOut' },
+      })
+      onRemoveMeal(meal.id)
+      return
+    }
+
+    swipeControls.start({ x: 0, transition: { type: 'spring', stiffness: 420, damping: 28 } })
+  }
 
   return (
-    <div
+    <motion.div
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.3}
+      onDragEnd={handleDragEnd}
+      animate={swipeControls}
       className={[
         'rounded-xl border border-slate-100 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-800/60',
         meal.completed ? 'opacity-70' : '',
@@ -28,6 +50,10 @@ function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
           </p>
         </div>
       </TapButton>
+
+      <p className="mt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+        {t('planner.swipeHint')}
+      </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <TapButton
@@ -61,7 +87,7 @@ function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
           {t('planner.removeButton')}
         </TapButton>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

@@ -50,6 +50,7 @@ function MealPlanSheet({
               onChange={(event) => onMealTypeChange(event.target.value)}
               className="w-full rounded-xl border border-white/55 bg-white/80 px-3 py-2 text-sm outline-none ring-kapya-300 focus:ring-2 dark:border-slate-700 dark:bg-slate-800"
             >
+              <option value="kahvalti">{labels.breakfast}</option>
               <option value="ogle">{labels.lunch}</option>
               <option value="aksam">{labels.dinner}</option>
             </select>
@@ -96,7 +97,7 @@ function MealPlanSheet({
 MealPlanSheet.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   mealDate: PropTypes.string.isRequired,
-  mealType: PropTypes.oneOf(['ogle', 'aksam']).isRequired,
+  mealType: PropTypes.oneOf(['kahvalti', 'ogle', 'aksam']).isRequired,
   portionSize: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   onDateChange: PropTypes.func.isRequired,
   onMealTypeChange: PropTypes.func.isRequired,
@@ -108,6 +109,7 @@ MealPlanSheet.propTypes = {
     dayLabel: PropTypes.string.isRequired,
     mealTypeLabel: PropTypes.string.isRequired,
     portionLabel: PropTypes.string.isRequired,
+    breakfast: PropTypes.string.isRequired,
     lunch: PropTypes.string.isRequired,
     dinner: PropTypes.string.isRequired,
     cancelButton: PropTypes.string.isRequired,

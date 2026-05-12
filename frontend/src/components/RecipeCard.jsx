@@ -26,8 +26,18 @@ function RecipeCard({ recipe }) {
 
   const [isPlanSheetOpen, setIsPlanSheetOpen] = useState(false)
   const [plannedDate, setPlannedDate] = useState(getTodayDate)
-  const [mealType, setMealType] = useState('ogle')
+  const [mealType, setMealType] = useState('kahvalti')
   const [portionSize, setPortionSize] = useState(2)
+
+  const formattedPortionCost = useMemo(
+    () =>
+      new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY',
+        maximumFractionDigits: 2,
+      }).format(Math.max(0, Number(recipe?.porsiyonMaliyetiTl) || 0)),
+    [recipe?.porsiyonMaliyetiTl],
+  )
 
   const matchedIngredients = useMemo(
     () =>
@@ -80,7 +90,7 @@ function RecipeCard({ recipe }) {
 
   const openPlanSheet = () => {
     setPlannedDate(getTodayDate())
-    setMealType('ogle')
+    setMealType('kahvalti')
     setPortionSize(2)
     setIsPlanSheetOpen(true)
   }
@@ -106,6 +116,9 @@ function RecipeCard({ recipe }) {
         <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
           <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
           {t('recipes.timeLabel', { time: recipe?.tahminiSure || recipe?.tahminiSuresi || '-' })}
+        </p>
+        <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+          {t('recipes.portionCostLabel')}: {formattedPortionCost}
         </p>
       </div>
 
@@ -184,6 +197,7 @@ function RecipeCard({ recipe }) {
           dayLabel: t('planner.dayLabel'),
           mealTypeLabel: t('planner.mealTypeLabel'),
           portionLabel: t('planner.portionLabel'),
+          breakfast: t('planner.breakfast'),
           lunch: t('planner.lunch'),
           dinner: t('planner.dinner'),
           cancelButton: t('planner.cancelButton'),
@@ -203,6 +217,7 @@ RecipeCard.propTypes = {
     tahminiSure: PropTypes.string,
     tahminiSuresi: PropTypes.string,
     goruntuUrl: PropTypes.string,
+    porsiyonMaliyetiTl: PropTypes.number,
     matchedIngredients: PropTypes.arrayOf(
       PropTypes.shape({
         isim: PropTypes.string,

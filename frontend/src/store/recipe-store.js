@@ -12,6 +12,14 @@ const createRecipeId = () => {
 }
 
 const normalizeText = (value) => String(value ?? '').trim()
+const normalizeCurrency = (value) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0
+  }
+
+  return Number(parsed.toFixed(2))
+}
 
 const normalizeRecipeNameKey = (value) =>
   normalizeText(value)
@@ -89,6 +97,9 @@ const normalizeIncomingRecipe = (recipeInput) => {
       missing: missingIngredients,
     },
     adimlar: normalizeStringList(recipe?.adimlar ?? recipe?.pisirmeAdimlari),
+    porsiyonMaliyetiTl: normalizeCurrency(
+      recipe?.porsiyonMaliyetiTl ?? recipe?.porsiyonMaliyeti ?? recipe?.costPerPlateTl,
+    ),
     nanoBananaGorseli:
       normalizeText(recipe?.nanoBananaGorseli ?? recipe?.goruntuUrl ?? recipe?.imageUrl) || '',
   }
@@ -153,6 +164,7 @@ export const toPlannerRecipe = (recipeInput) => {
     ortalamaKalori: recipe.kalori,
     porsiyon: recipe.porsiyon,
     zorluk: recipe.zorluk,
+    porsiyonMaliyetiTl: recipe.porsiyonMaliyetiTl,
     pufNoktasi: recipe.pufNoktalari,
     matchedIngredients: recipe.malzemeler.matched,
     missingIngredients: recipe.malzemeler.missing,
