@@ -21,6 +21,7 @@ function RecipeCard({ recipe }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const consumeRecipeIngredients = usePantryStore((state) => state.consumeRecipeIngredients)
+  const clearRecentRecipes = usePantryStore((state) => state.clearRecentRecipes)
   const showToast = usePantryStore((state) => state.showToast)
 
   const [portionSize, setPortionSize] = useState(2)
@@ -55,6 +56,7 @@ function RecipeCard({ recipe }) {
       ingredients,
       portionSize,
     })
+    clearRecentRecipes()
 
     showToast(t('recipes.toastSaved'))
     navigate('/')

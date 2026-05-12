@@ -30,10 +30,10 @@ export const generateWasteSaverRecipes = async ({
     body: JSON.stringify(payload),
   })
 
-  const payload = await response.json().catch(() => null)
+  const responsePayload = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(payload?.error || 'RECIPE_GENERATION_FAILED')
+    throw new Error(responsePayload?.error || 'RECIPE_GENERATION_FAILED')
   }
 
-  return payload?.data
+  return responsePayload?.data
 }

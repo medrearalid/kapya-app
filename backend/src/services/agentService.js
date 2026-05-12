@@ -1,486 +1,276 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
-import { DynamicTool } from '@langchain/core/tools'
-import { createAgent } from 'langchain'
 
-const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
-const MS_PER_DAY = 1000 * 60 * 60 * 24
+const MEAL_DB_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
+const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
-const BUDGET_PROFILES = {
-  ogrenci: {
-    outsideOrderCost: 260,
-    homeCookCost: 95,
-    recipeCostLabel: '30-50 TL',
-  },
-  aile: {
-    outsideOrderCost: 430,
-    homeCookCost: 175,
-    recipeCostLabel: '55-95 TL',
-  },
-  luks: {
-    outsideOrderCost: 720,
-    homeCookCost: 340,
-    recipeCostLabel: '120-190 TL',
-  },
+const NANO_BANANA_FALLBACK_IMAGE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5J2nEAAAAASUVORK5CYII='
+
+const TR_TO_EN_INGREDIENT_MAP = {
+  yumurta: 'egg',
+  sut: 'milk',
+  peynir: 'cheese',
+  yogurt: 'yogurt',
+  tereyagi: 'butter',
+  margarin: 'margarine',
+  zeytinyagi: 'olive oil',
+  aycicek_yagi: 'sunflower oil',
+  domates: 'tomato',
+  salatalik: 'cucumber',
+  biber: 'pepper',
+  patates: 'potato',
+  sogan: 'onion',
+  sarimsak: 'garlic',
+  havuc: 'carrot',
+  pirinc: 'rice',
+  makarna: 'pasta',
+  tavuk: 'chicken',
+  et: 'beef',
+  kiyma: 'minced beef',
+  nohut: 'chickpea',
+  mercimek: 'lentil',
+  fasulye: 'beans',
+  ekmek: 'bread',
+  un: 'flour',
+  seker: 'sugar',
+  tuz: 'salt',
+  karabiber: 'black pepper',
+  maydanoz: 'parsley',
+  dereotu: 'dill',
+  limon: 'lemon',
 }
 
-const DEFAULT_BUDGET_PROFILE = 'ogrenci'
-
-const SYSTEM_PROMPT =
-  "Sen 'Kapya' adlı uygulamanın proaktif finans ve mutfak şefi ajanısın. Görevin israfı önlemek ve bütçeyi korumaktır. Kullanıcıdan gelen isteğe göre önce envanteri analiz et, tasarrufu hesapla ve uygun tarifleri üret."
-
-const toSafeNumber = (value, fallback = 0) => {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
+const UNIT_MAP = {
+  tbsp: 'yemek kasigi',
+  tablespoons: 'yemek kasigi',
+  tablespoon: 'yemek kasigi',
+  tsp: 'cay kasigi',
+  teaspoon: 'cay kasigi',
+  teaspoons: 'cay kasigi',
+  cup: 'su bardagi',
+  cups: 'su bardagi',
+  g: 'gram',
+  gram: 'gram',
+  grams: 'gram',
+  kg: 'kilogram',
+  ml: 'mililitre',
+  l: 'litre',
+  litre: 'litre',
+  liter: 'litre',
+  pinch: 'tutam',
+  cloves: 'dis',
+  clove: 'dis',
+  piece: 'adet',
+  pieces: 'adet',
 }
-
-const clamp = (value, minValue, maxValue) => Math.min(Math.max(value, minValue), maxValue)
 
 const normalizeText = (value) =>
   String(value ?? '')
     .trim()
     .toLocaleLowerCase('tr-TR')
-
-const normalizeBudgetProfile = (value) => {
-  const normalized = normalizeText(value)
-    .replaceAll('ö', 'o')
-    .replaceAll('ü', 'u')
-    .replaceAll('ş', 's')
-    .replaceAll('ı', 'i')
-    .replaceAll('ğ', 'g')
     .replaceAll('ç', 'c')
+    .replaceAll('ğ', 'g')
+    .replaceAll('ı', 'i')
+    .replaceAll('ö', 'o')
+    .replaceAll('ş', 's')
+    .replaceAll('ü', 'u')
 
-  if (normalized in BUDGET_PROFILES) {
-    return normalized
-  }
-
-  return DEFAULT_BUDGET_PROFILE
-}
-
-const normalizeAgentInstruction = ({ agentInstruction, requestMode, urgentProducts }) => {
-  const explicitInstruction = String(agentInstruction ?? '').trim()
-  if (explicitInstruction) {
-    return explicitInstruction
-  }
-
-  const hasUrgentProducts = Array.isArray(urgentProducts) && urgentProducts.length > 0
-  if (requestMode === 'waste-prevent' || hasUrgentProducts) {
-    return 'Bu acil urunleri merkeze alarak israf onleyici tarif uret.'
-  }
-
-  return 'Buzdolabindaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
-}
-
-const calculateDaysLeft = (dateValue) => {
-  const targetDate = new Date(String(dateValue ?? '').trim())
-  if (Number.isNaN(targetDate.getTime())) {
-    return null
-  }
-
-  const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const startOfTarget = new Date(
-    targetDate.getFullYear(),
-    targetDate.getMonth(),
-    targetDate.getDate(),
-  )
-
-  return Math.ceil((startOfTarget.getTime() - startOfToday.getTime()) / MS_PER_DAY)
-}
+const normalizeEnglishText = (value) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9\s]/g, ' ')
+    .replaceAll(/\s+/g, ' ')
 
 const sanitizeProduct = (product) => ({
   name: String(product?.name ?? product?.urunAdi ?? '').trim(),
-  quantity: Math.max(0, toSafeNumber(product?.quantity ?? product?.miktar, 0)),
+  quantity: Number(product?.quantity ?? product?.miktar ?? 0),
   unit: String(product?.unit ?? product?.birim ?? 'adet').trim() || 'adet',
-  estimatedShelfLifeEndDate: String(
-    product?.estimatedShelfLifeEndDate ?? product?.tahminiRafOmruBitisTarihi ?? '',
-  ).trim(),
 })
 
 const sanitizeProductList = (products) =>
   (Array.isArray(products) ? products : []).map(sanitizeProduct).filter((item) => item.name)
 
-const sanitizeRecipeNameList = (recipeNames) =>
-  (Array.isArray(recipeNames) ? recipeNames : [])
-    .map((name) => String(name ?? '').trim())
-    .filter(Boolean)
-
-const safeParseJson = (rawValue) => {
-  if (typeof rawValue !== 'string') {
-    return {}
-  }
-
-  const trimmed = rawValue.trim()
-  if (!trimmed) {
-    return {}
-  }
-
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    return {}
-  }
-}
-
-const buildCriticalProducts = ({ pantryStock, urgentProducts }) => {
-  const criticalMap = new Map()
-
-  const pushCritical = (product, daysLeft = null) => {
-    const key = `${normalizeText(product.name)}::${normalizeText(product.unit)}`
-    if (criticalMap.has(key)) {
-      return
-    }
-
-    criticalMap.set(key, {
-      name: product.name,
-      quantity: Math.max(1, toSafeNumber(product.quantity, 1)),
-      unit: product.unit || 'adet',
-      estimatedShelfLifeEndDate: product.estimatedShelfLifeEndDate || '',
-      kalanGun: daysLeft,
-      kritikSeviye: daysLeft !== null && daysLeft <= 0 ? 'acil' : 'yaklasiyor',
-    })
-  }
-
-  sanitizeProductList(urgentProducts).forEach((product) => {
-    const daysLeft = calculateDaysLeft(product.estimatedShelfLifeEndDate)
-    pushCritical(product, daysLeft)
-  })
-
-  sanitizeProductList(pantryStock).forEach((product) => {
-    const daysLeft = calculateDaysLeft(product.estimatedShelfLifeEndDate)
-    if (daysLeft !== null && daysLeft <= 2) {
-      pushCritical(product, daysLeft)
-    }
-  })
-
-  return Array.from(criticalMap.values())
-}
-
-const createFallbackRecipes = ({ criticalProducts, pantryStock, budgetProfile }) => {
-  const stockPool = sanitizeProductList(pantryStock)
-  const criticalPool = Array.isArray(criticalProducts) ? criticalProducts : []
-  const profile = BUDGET_PROFILES[normalizeBudgetProfile(budgetProfile)]
-
-  const resolveCoreIngredient = (index) => {
-    if (criticalPool.length > 0) {
-      return criticalPool[index % criticalPool.length]
-    }
-
-    if (stockPool.length > 0) {
-      return stockPool[index % stockPool.length]
-    }
-
-    return {
-      name: 'sebze karisimi',
-      quantity: 1,
-      unit: 'porsiyon',
-      estimatedShelfLifeEndDate: '',
-      kalanGun: null,
-      kritikSeviye: 'yaklasiyor',
-    }
-  }
-
-  const resolveSupportIngredient = (index) => {
-    if (stockPool.length > 0) {
-      return stockPool[(index + 1) % stockPool.length]
-    }
-
-    return {
-      name: 'domates',
-      quantity: 2,
-      unit: 'adet',
-      estimatedShelfLifeEndDate: '',
-    }
-  }
-
-  const templates = [
-    {
-      nameSuffix: 'Ile Pratik Tava',
-      description: 'Tek tavada hizli pisirme ile kritik urunleri degerlendirir.',
-      staples: [
-        { name: 'zeytinyagi', baseAmount: 1, unit: 'yemek kasigi' },
-        { name: 'karabiber', baseAmount: 0.25, unit: 'tatli kasigi' },
-      ],
-    },
-    {
-      nameSuffix: 'Omlet Kasesi',
-      description: 'Kahvalti ve aksam icin uygun, ekonomik bir secenek.',
-      staples: [
-        { name: 'yumurta', baseAmount: 2, unit: 'adet' },
-        { name: 'tuz', baseAmount: 0.2, unit: 'tatli kasigi' },
-      ],
-    },
-    {
-      nameSuffix: 'Firinda Bowl',
-      description: 'Firinda bol porsiyon cikararak israfi azaltir.',
-      staples: [
-        { name: 'yogurt', baseAmount: 0.2, unit: 'litre' },
-        { name: 'pul biber', baseAmount: 0.15, unit: 'tatli kasigi' },
-      ],
-    },
-  ]
-
-  return templates.map((template, index) => {
-    const core = resolveCoreIngredient(index)
-    const support = resolveSupportIngredient(index)
-
-    return {
-      tarifAdi: `${core.name} ${template.nameSuffix}`,
-      kisaAciklama: template.description,
-      tahminiPorsiyonBasiMaliyet: profile.recipeCostLabel,
-      malzemeler: [
-        {
-          name: core.name,
-          baseAmount: core.unit === 'adet' ? 1 : 150,
-          unit: core.unit === 'adet' ? 'adet' : 'gram',
-        },
-        {
-          name: support.name,
-          baseAmount: support.unit === 'adet' ? 1 : 80,
-          unit: support.unit === 'adet' ? 'adet' : 'gram',
-        },
-        ...template.staples,
-      ],
-    }
-  })
-}
-
-const buildAnalyzeInventoryTool = () =>
-  new DynamicTool({
-    name: 'AnalyzeInventoryTool',
-    description:
-      'Buzdolabi JSON verisini analiz eder ve raf omru kritik urunleri listeler. Input JSON: { pantryStock: Product[], urgentProducts: Product[] }',
-    func: async (rawInput) => {
-      const payload = safeParseJson(rawInput)
-      const criticalProducts = buildCriticalProducts({
-        pantryStock: payload?.pantryStock,
-        urgentProducts: payload?.urgentProducts,
-      })
-
-      const result = {
-        kritikUrunler: criticalProducts,
-        kritikUrunSayisi: criticalProducts.length,
-      }
-
-      return JSON.stringify(result)
-    },
-  })
-
-const buildCalculateSavingsTool = () =>
-  new DynamicTool({
-    name: 'CalculateSavingsTool',
-    description:
-      'Butce profiline gore disaridan siparis maliyeti ile evde yapma maliyetini karsilastirir. Input JSON: { budgetProfile: string, criticalProducts: Product[] }',
-    func: async (rawInput) => {
-      const payload = safeParseJson(rawInput)
-      const normalizedProfile = normalizeBudgetProfile(payload?.budgetProfile)
-      const profileCosts = BUDGET_PROFILES[normalizedProfile]
-      const criticalCount = Array.isArray(payload?.criticalProducts)
-        ? payload.criticalProducts.length
-        : 0
-
-      const mealCount = clamp(criticalCount || 2, 1, 6)
-      const disaridaYemeMaliyeti = profileCosts.outsideOrderCost * mealCount
-      const evdeYapmaMaliyeti = profileCosts.homeCookCost * mealCount
-      const tasarrufEdilenTutar = Math.max(disaridaYemeMaliyeti - evdeYapmaMaliyeti, 0)
-
-      const result = {
-        budgetProfile: normalizedProfile,
-        mealCount,
-        disaridaYemeMaliyeti,
-        evdeYapmaMaliyeti,
-        tasarrufEdilenTutar,
-      }
-
-      return JSON.stringify(result)
-    },
-  })
-
-const buildGenerateRecipeTool = () =>
-  new DynamicTool({
-    name: 'GenerateRecipeTool',
-    description:
-      'Kritik urunleri baz alip 3 porsiyonlanabilir tarif dondurur. Input JSON: { budgetProfile: string, criticalProducts: Product[], pantryStock: Product[] }',
-    func: async (rawInput) => {
-      const payload = safeParseJson(rawInput)
-      const recipes = createFallbackRecipes({
-        criticalProducts: Array.isArray(payload?.criticalProducts) ? payload.criticalProducts : [],
-        pantryStock: sanitizeProductList(payload?.pantryStock),
-        budgetProfile: payload?.budgetProfile,
-      })
-
-      return JSON.stringify({ tarifler: recipes })
-    },
-  })
-
-const extractJsonFromText = (rawText) => {
-  const value = String(rawText ?? '').trim()
-  if (!value) {
+const parseLooseJson = (rawValue) => {
+  const text = String(rawValue ?? '').trim()
+  if (!text) {
     return null
   }
 
-  try {
-    return JSON.parse(value)
-  } catch {
-    const firstBrace = value.indexOf('{')
-    const lastBrace = value.lastIndexOf('}')
+  const cleanText = text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/i, '')
+    .trim()
 
-    if (firstBrace < 0 || lastBrace < 0 || lastBrace <= firstBrace) {
+  try {
+    return JSON.parse(cleanText)
+  } catch {
+    const startIndex = cleanText.indexOf('{')
+    const endIndex = cleanText.lastIndexOf('}')
+    if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
       return null
     }
 
-    const candidate = value.slice(firstBrace, lastBrace + 1)
     try {
-      return JSON.parse(candidate)
+      return JSON.parse(cleanText.slice(startIndex, endIndex + 1))
     } catch {
       return null
     }
   }
 }
 
-const flattenMessageContent = (content) => {
+const readLlmText = (message) => {
+  const content = message?.content
   if (typeof content === 'string') {
     return content
   }
 
   if (Array.isArray(content)) {
     return content
-      .map((part) => {
-        if (typeof part === 'string') {
-          return part
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item
         }
-
-        if (part && typeof part === 'object') {
-          if (typeof part.text === 'string') {
-            return part.text
-          }
-
-          if (typeof part.output_text === 'string') {
-            return part.output_text
-          }
-
-          if (typeof part.content === 'string') {
-            return part.content
-          }
-        }
-
-        return ''
+        return typeof item?.text === 'string' ? item.text : ''
       })
       .join('\n')
-  }
-
-  if (content && typeof content === 'object' && typeof content.text === 'string') {
-    return content.text
+      .trim()
   }
 
   return ''
 }
 
-const extractAgentOutputText = (agentState) => {
-  const messages = Array.isArray(agentState?.messages) ? agentState.messages : []
+const fractionToNumber = (value) => {
+  const text = String(value ?? '').trim()
+  if (!text) {
+    return null
+  }
 
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    const messageType = String(message?.type ?? '').toLocaleLowerCase('tr-TR')
-    const messageRole = String(message?.role ?? '').toLocaleLowerCase('tr-TR')
-    const isAssistantMessage =
-      messageType.includes('ai') || messageRole === 'assistant' || messageRole === 'ai'
+  if (/^\d+(\.\d+)?$/.test(text)) {
+    return Number(text)
+  }
 
-    if (!isAssistantMessage) {
+  if (/^\d+\/\d+$/.test(text)) {
+    const [numerator, denominator] = text.split('/').map(Number)
+    if (denominator === 0) {
+      return null
+    }
+    return numerator / denominator
+  }
+
+  if (/^\d+\s+\d+\/\d+$/.test(text)) {
+    const [whole, fraction] = text.split(' ')
+    const wholeNumber = Number(whole)
+    const fractionNumber = fractionToNumber(fraction)
+    if (!Number.isFinite(wholeNumber) || !Number.isFinite(fractionNumber)) {
+      return null
+    }
+    return wholeNumber + fractionNumber
+  }
+
+  return null
+}
+
+const parseMeasure = (measureText) => {
+  const raw = String(measureText ?? '').trim()
+  if (!raw) {
+    return { miktar: '1', birim: 'adet' }
+  }
+
+  const compact = raw.replaceAll(',', '.')
+  const match = /^([\d./\s]+)?\s*([A-Za-z]+)?/.exec(compact)
+  const amountCandidate = String(match?.[1] ?? '').trim()
+  const unitCandidate = normalizeEnglishText(match?.[2] ?? '')
+  const numericAmount = fractionToNumber(amountCandidate)
+  const miktar =
+    numericAmount === null
+      ? amountCandidate || '1'
+      : String(Number(numericAmount.toFixed(2)))
+
+  return {
+    miktar,
+    birim: UNIT_MAP[unitCandidate] || unitCandidate || 'adet',
+  }
+}
+
+const extractMealIngredients = (mealDetails) => {
+  const ingredients = []
+
+  for (let index = 1; index <= 20; index += 1) {
+    const englishName = String(mealDetails?.[`strIngredient${index}`] ?? '').trim()
+    if (!englishName) {
       continue
     }
 
-    const text = flattenMessageContent(message?.content).trim()
-    if (text) {
-      return text
+    const measure = String(mealDetails?.[`strMeasure${index}`] ?? '').trim()
+    ingredients.push({
+      englishName,
+      measure,
+      ...parseMeasure(measure),
+    })
+  }
+
+  return ingredients
+}
+
+const fetchJson = async (url) => {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`External API request failed: ${response.status}`)
+  }
+  return response.json()
+}
+
+const fetchMealIdsByIngredient = async (ingredientEnglish) => {
+  const queryValue = encodeURIComponent(String(ingredientEnglish ?? '').trim())
+  if (!queryValue) {
+    return []
+  }
+
+  const payload = await fetchJson(`${MEAL_DB_BASE_URL}/filter.php?i=${queryValue}`)
+  const meals = Array.isArray(payload?.meals) ? payload.meals : []
+  return meals
+    .map((meal) => String(meal?.idMeal ?? '').trim())
+    .filter(Boolean)
+}
+
+const fetchMealDetailById = async (mealId) => {
+  const payload = await fetchJson(`${MEAL_DB_BASE_URL}/lookup.php?i=${encodeURIComponent(mealId)}`)
+  const meal = Array.isArray(payload?.meals) ? payload.meals[0] : null
+  if (!meal) {
+    return null
+  }
+
+  return {
+    idMeal: String(meal.idMeal),
+    strMeal: String(meal.strMeal ?? '').trim(),
+    strMealThumb: String(meal.strMealThumb ?? '').trim(),
+    strInstructions: String(meal.strInstructions ?? '').trim(),
+    ingredients: extractMealIngredients(meal),
+  }
+}
+
+const isIngredientInStock = (ingredientEnglish, pantryEnglishNames) => {
+  const normalizedIngredient = normalizeEnglishText(ingredientEnglish)
+  if (!normalizedIngredient) {
+    return false
+  }
+
+  return pantryEnglishNames.some((pantryName) => {
+    if (!pantryName) {
+      return false
     }
-  }
 
-  return ''
-}
+    if (pantryName === normalizedIngredient) {
+      return true
+    }
 
-const normalizeIngredient = (ingredient) => ({
-  name: String(ingredient?.name ?? ingredient?.isim ?? '').trim(),
-  baseAmount: toSafeNumber(ingredient?.baseAmount ?? ingredient?.bazMiktar, 0),
-  unit: String(ingredient?.unit ?? ingredient?.birim ?? '').trim(),
-})
-
-const normalizeRecipe = (recipe) => {
-  const ingredients = (Array.isArray(recipe?.malzemeler) ? recipe.malzemeler : [])
-    .map(normalizeIngredient)
-    .filter((ingredient) => ingredient.name && ingredient.unit && ingredient.baseAmount > 0)
-
-  return {
-    tarifAdi: String(recipe?.tarifAdi ?? '').trim(),
-    kisaAciklama: String(recipe?.kisaAciklama ?? '').trim(),
-    tahminiPorsiyonBasiMaliyet: String(recipe?.tahminiPorsiyonBasiMaliyet ?? '').trim(),
-    malzemeler: ingredients,
-  }
-}
-
-const normalizeStructuredResponse = ({ parsedResult, inputPayload }) => {
-  const parsedRecipes = (Array.isArray(parsedResult?.tarifler) ? parsedResult.tarifler : [])
-    .map(normalizeRecipe)
-    .filter(
-      (recipe) =>
-        recipe.tarifAdi &&
-        recipe.kisaAciklama &&
-        recipe.tahminiPorsiyonBasiMaliyet &&
-        recipe.malzemeler.length > 0,
-    )
-
-  const fallbackRecipes = createFallbackRecipes({
-    criticalProducts: buildCriticalProducts({
-      pantryStock: inputPayload.pantryStock,
-      urgentProducts: inputPayload.urgentProducts,
-    }),
-    pantryStock: inputPayload.pantryStock,
-    budgetProfile: inputPayload.budgetProfile,
+    return pantryName.includes(normalizedIngredient) || normalizedIngredient.includes(pantryName)
   })
-
-  const mergedRecipes = [...parsedRecipes]
-  while (mergedRecipes.length < 3) {
-    mergedRecipes.push(fallbackRecipes[mergedRecipes.length])
-  }
-
-  const finalRecipes = mergedRecipes.slice(0, 3)
-
-  const criticalCount = buildCriticalProducts({
-    pantryStock: inputPayload.pantryStock,
-    urgentProducts: inputPayload.urgentProducts,
-  }).length
-  const profileCosts = BUDGET_PROFILES[normalizeBudgetProfile(inputPayload.budgetProfile)]
-  const inferredMealCount = clamp(criticalCount || 2, 1, 6)
-  const inferredSavings = Math.max(
-    profileCosts.outsideOrderCost * inferredMealCount -
-      profileCosts.homeCookCost * inferredMealCount,
-    0,
-  )
-
-  const tasarrufEdilenTutar = Math.max(
-    0,
-    Math.round(toSafeNumber(parsedResult?.tasarrufEdilenTutar, inferredSavings)),
-  )
-
-  const defaultAgentMessage = `Kritik urunleri bozulmadan kullanarak yaklasik ${tasarrufEdilenTutar} TL tasarruf ettiniz.`
-  const ajanMesaji =
-    String(parsedResult?.ajanMesaji ?? '').trim() ||
-    defaultAgentMessage
-
-  return {
-    tarifler: finalRecipes,
-    tasarrufEdilenTutar,
-    ajanMesaji,
-  }
 }
 
-export const executeKapyaAgent = async ({
-  budgetProfile,
-  pantryStock,
-  urgentProducts,
-  agentInstruction,
-  requestMode,
-  recentRecipeNames,
-}) => {
+const getLlmClient = () => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
   if (!apiKey) {
     const missingKeyError = new Error('Sunucuda GEMINI_API_KEY tanimli degil.')
@@ -488,106 +278,325 @@ export const executeKapyaAgent = async ({
     throw missingKeyError
   }
 
-  const inputPayload = {
-    budgetProfile: normalizeBudgetProfile(budgetProfile),
-    pantryStock: sanitizeProductList(pantryStock),
-    urgentProducts: sanitizeProductList(urgentProducts),
-    requestMode: String(requestMode ?? '').trim() || 'auto',
-    agentInstruction: normalizeAgentInstruction({
-      agentInstruction,
-      requestMode,
-      urgentProducts,
-    }),
-    recentRecipeNames: sanitizeRecipeNameList(recentRecipeNames),
-  }
-
-  const llm = new ChatGoogleGenerativeAI({
+  return new ChatGoogleGenerativeAI({
     apiKey,
     model: MODEL_NAME,
     temperature: 0.2,
   })
+}
 
-  const tools = [
-    buildAnalyzeInventoryTool(),
-    buildCalculateSavingsTool(),
-    buildGenerateRecipeTool(),
-  ]
+const translateIngredientNamesToEnglish = async ({ llm, pantryIngredientNames }) => {
+  const normalizedNames = pantryIngredientNames
+    .map((name) => String(name ?? '').trim())
+    .filter(Boolean)
 
-  const agentPromptLines = [
-    SYSTEM_PROMPT,
-    'Mutlaka sirayla AnalyzeInventoryTool -> CalculateSavingsTool -> GenerateRecipeTool kullan.',
-    'Kullanicidan gelen agentInstruction alanindaki talimata kesinlikle uy.',
-    'requestMode alani waste-prevent ise acil urunleri onceliklendir; daily-profile ise gunluk dengeli tarif oner.',
-  ]
-
-  if (inputPayload.recentRecipeNames.length > 0) {
-    agentPromptLines.push(
-      `Kullanici daha once onerdigin su tarifleri reddetti: ${inputPayload.recentRecipeNames.join(', ')}. Lutfen bu tarifleri veya cok benzer varyasyonlarini TEKRAR ONERME. Tamamen farkli ve yaratici alternatifler uret.`,
-    )
+  if (normalizedNames.length === 0) {
+    return []
   }
 
-  const agentPrompt = [
-    ...agentPromptLines,
-    'Ardindan sadece gecerli JSON dondur; markdown veya baska metin dondurme.',
-    'JSON semasi:',
-    '{',
-    '  "tarifler": [',
-    '    {',
-    '      "tarifAdi": "string",',
-    '      "kisaAciklama": "string",',
-    '      "tahminiPorsiyonBasiMaliyet": "string",',
-    '      "malzemeler": [',
-    '        { "name": "string", "baseAmount": number, "unit": "string" }',
-    '      ]',
-    '    }',
-    '  ],',
-    '  "tasarrufEdilenTutar": number,',
-    '  "ajanMesaji": "string"',
-    '}',
-    'tarifler dizisinde tam olarak 3 tarif olmalidir.',
+  const missingNames = normalizedNames.filter((name) => {
+    const key = normalizeText(name).replaceAll(' ', '_')
+    return !TR_TO_EN_INGREDIENT_MAP[key]
+  })
+
+  const fallbackTranslations = normalizedNames.map((name) => {
+    const key = normalizeText(name).replaceAll(' ', '_')
+    return {
+      source: name,
+      english: TR_TO_EN_INGREDIENT_MAP[key] || name,
+    }
+  })
+
+  if (missingNames.length === 0) {
+    return fallbackTranslations
+  }
+
+  const prompt = [
+    'Translate Turkish pantry ingredient names to concise culinary English.',
+    'Return STRICT JSON only in this format:',
+    '{"translations":[{"source":"...","english":"..."}]}',
+    'Rules:',
+    '- Preserve ingredient meaning in kitchen context.',
+    '- Use lowercase English names.',
+    `Ingredients: ${JSON.stringify(missingNames)}`,
   ].join('\n')
 
-  const agent = createAgent({
-    llm,
-    tools,
-    prompt: agentPrompt,
-  })
+  const llmResponse = await llm.invoke(prompt)
+  const parsed = parseLooseJson(readLlmText(llmResponse))
+  const translatedItems = Array.isArray(parsed?.translations) ? parsed.translations : []
 
-  console.log('[kapya-agent] request', inputPayload)
-
-  let result
-  try {
-    const agentState = await agent.invoke({
-      messages: [
-        {
-          role: 'user',
-          content: JSON.stringify(inputPayload),
-        },
-      ],
-    })
-
-    result = {
-      output: extractAgentOutputText(agentState),
+  const translationMap = new Map()
+  translatedItems.forEach((item) => {
+    const source = String(item?.source ?? '').trim()
+    const english = String(item?.english ?? '').trim()
+    if (source && english) {
+      translationMap.set(source, english)
     }
-  } catch {
-    const providerError = new Error('Kapya ajanindan gecerli yanit alinamadi.')
-    providerError.statusCode = 502
-    throw providerError
-  }
-
-  const parsedResult = extractJsonFromText(result?.output)
-  if (!parsedResult) {
-    const parsingError = new Error('Kapya ajani gecerli JSON dondurmedi.')
-    parsingError.statusCode = 502
-    throw parsingError
-  }
-
-  const normalizedResponse = normalizeStructuredResponse({
-    parsedResult,
-    inputPayload,
   })
 
-  console.log('[kapya-agent] structured-response', normalizedResponse)
+  return fallbackTranslations.map((item) => ({
+    ...item,
+    english: translationMap.get(item.source) || item.english,
+  }))
+}
 
-  return normalizedResponse
+const buildConstraintTranslatorOutput = async ({ llm, acceptedMeals }) => {
+  if (acceptedMeals.length === 0) {
+    return []
+  }
+
+  const payload = acceptedMeals.map((meal) => ({
+    mealId: meal.idMeal,
+    mealName: meal.strMeal,
+    instructions: meal.strInstructions,
+    ingredients: meal.ingredients.map((ingredient) => ({
+      englishName: ingredient.englishName,
+      measure: ingredient.measure,
+    })),
+  }))
+
+  const prompt = [
+    'You are ConstraintTranslator_Tool for a Turkish recipe assistant.',
+    'Return STRICT JSON only in this format:',
+    '{"recipes":[{"mealId":"...","tarifAdi":"...","kisaAciklama":"...","tahminiSuresi":"...","pisirmeAdimlari":["Adim 1..."],"ingredientTranslations":[{"englishName":"...","isim":"...","miktar":"...","birim":"..."}]}]}',
+    'Rules:',
+    '1) Turkish must be natural and culinary-correct.',
+    '2) Convert ingredient measures naturally (example: 2 Tbsp Olive Oil -> 2 yemek kasigi zeytinyagi).',
+    '3) Keep 4-8 clear cooking steps per recipe.',
+    '4) Keep ingredientTranslations complete for each ingredient in input.',
+    `Input recipes: ${JSON.stringify(payload)}`,
+  ].join('\n')
+
+  const llmResponse = await llm.invoke(prompt)
+  const parsed = parseLooseJson(readLlmText(llmResponse))
+  return Array.isArray(parsed?.recipes) ? parsed.recipes : []
+}
+
+const fallbackTurkishName = (englishName) => {
+  const normalized = normalizeEnglishText(englishName)
+  const match = Object.entries(TR_TO_EN_INGREDIENT_MAP).find(([, value]) => value === normalized)
+  if (!match) {
+    return englishName
+  }
+  return match[0].replaceAll('_', ' ')
+}
+
+const toCompactIngredient = (ingredient, translatedIngredient) => {
+  return {
+    isim:
+      String(translatedIngredient?.isim ?? '').trim() || fallbackTurkishName(ingredient.englishName),
+    miktar:
+      String(translatedIngredient?.miktar ?? '').trim() || String(ingredient.miktar ?? '1').trim() || '1',
+    birim:
+      String(translatedIngredient?.birim ?? '').trim() || String(ingredient.birim ?? 'adet').trim() || 'adet',
+  }
+}
+
+const splitMatchedAndMissingIngredients = ({
+  ingredients,
+  pantryEnglishSet,
+  translatedIngredientMap,
+}) => {
+  const matchedIngredients = []
+  const missingIngredients = []
+
+  ingredients.forEach((ingredient) => {
+    const translatedIngredient = translatedIngredientMap.get(normalizeEnglishText(ingredient.englishName))
+    const compactIngredient = toCompactIngredient(ingredient, translatedIngredient)
+
+    if (isIngredientInStock(ingredient.englishName, Array.from(pantryEnglishSet))) {
+      matchedIngredients.push(compactIngredient)
+    } else {
+      missingIngredients.push(compactIngredient)
+    }
+  })
+
+  return { matchedIngredients, missingIngredients }
+}
+
+const buildCookingStepsFallback = (instructionsText) => {
+  const chunks = String(instructionsText ?? '')
+    .split(/\r?\n|\./)
+    .map((step) => step.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+
+  if (chunks.length === 0) {
+    return ['Adim 1: Malzemeleri hazirlayin.', 'Adim 2: Pisirme islemini tarife gore tamamlayin.']
+  }
+
+  return chunks.map((step, index) => `Adim ${index + 1}: ${step}`)
+}
+
+const NanoBananaImageTool = async ({ mealNameTr, mealNameEn, fallbackImageUrl }) => {
+  const apiUrl = String(process.env.NANO_BANANA_API_URL ?? '').trim()
+  const apiKey = String(process.env.NANO_BANANA_API_KEY ?? '').trim()
+
+  if (apiUrl && apiKey) {
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          prompt: `Plate photo of cooked dish: ${mealNameTr || mealNameEn}`,
+          size: '1024x1024',
+        }),
+      })
+
+      if (response.ok) {
+        const payload = await response.json().catch(() => null)
+        const imageUrl = String(payload?.imageUrl ?? '').trim()
+        const base64Image = String(payload?.base64 ?? '').trim()
+
+        if (imageUrl) {
+          return imageUrl
+        }
+
+        if (base64Image) {
+          return `data:image/png;base64,${base64Image}`
+        }
+      }
+    } catch {
+      // Fallback path intentionally silent.
+    }
+  }
+
+  return String(fallbackImageUrl ?? '').trim() || NANO_BANANA_FALLBACK_IMAGE
+}
+
+const rankMealsByStockFit = ({ mealDetails, pantryEnglishSet }) => {
+  const pantryEnglishNames = Array.from(pantryEnglishSet)
+
+  return mealDetails
+    .map((meal) => {
+      const ingredientCount = meal.ingredients.length
+      const missingCount = meal.ingredients.filter(
+        (ingredient) => !isIngredientInStock(ingredient.englishName, pantryEnglishNames),
+      ).length
+
+      return {
+        ...meal,
+        ingredientCount,
+        missingCount,
+        matchedCount: Math.max(ingredientCount - missingCount, 0),
+      }
+    })
+    .sort((left, right) => {
+      if (left.missingCount !== right.missingCount) {
+        return left.missingCount - right.missingCount
+      }
+      return right.matchedCount - left.matchedCount
+    })
+}
+
+export const executeKapyaAgent = async ({ pantryStock, urgentProducts }) => {
+  const llm = getLlmClient()
+
+  const normalizedPantryStock = sanitizeProductList(pantryStock)
+  const normalizedUrgentProducts = sanitizeProductList(urgentProducts)
+  const combinedStock = [...normalizedUrgentProducts, ...normalizedPantryStock]
+
+  const pantryIngredientNames = Array.from(new Set(combinedStock.map((item) => item.name.trim())))
+
+  if (pantryIngredientNames.length === 0) {
+    return { tarifler: [] }
+  }
+
+  const translations = await translateIngredientNamesToEnglish({
+    llm,
+    pantryIngredientNames,
+  })
+
+  const pantryEnglishSet = new Set(
+    translations.map((item) => normalizeEnglishText(item.english)).filter(Boolean),
+  )
+
+  const englishIngredientList = Array.from(pantryEnglishSet).slice(0, 8)
+  const mealIdGroups = await Promise.all(
+    englishIngredientList.map((ingredient) => fetchMealIdsByIngredient(ingredient)),
+  )
+
+  const mealIds = Array.from(new Set(mealIdGroups.flat())).slice(0, 24)
+  if (mealIds.length === 0) {
+    return { tarifler: [] }
+  }
+
+  const rawMealDetails = await Promise.all(mealIds.map((mealId) => fetchMealDetailById(mealId)))
+  const mealDetails = rawMealDetails
+    .filter(Boolean)
+    .filter((meal) => Array.isArray(meal.ingredients) && meal.ingredients.length > 0)
+
+  const rankedMeals = rankMealsByStockFit({
+    mealDetails,
+    pantryEnglishSet,
+  })
+
+  const acceptedMeals = rankedMeals.filter((meal) => meal.missingCount <= 3).slice(0, 3)
+  if (acceptedMeals.length === 0) {
+    return { tarifler: [] }
+  }
+
+  const translatedRecipes = await buildConstraintTranslatorOutput({
+    llm,
+    acceptedMeals,
+  })
+
+  const translatedRecipeMap = new Map()
+  translatedRecipes.forEach((recipe) => {
+    const mealId = String(recipe?.mealId ?? '').trim()
+    if (mealId) {
+      translatedRecipeMap.set(mealId, recipe)
+    }
+  })
+
+  const tarifler = await Promise.all(
+    acceptedMeals.map(async (meal) => {
+      const translatedRecipe = translatedRecipeMap.get(meal.idMeal)
+      const translatedIngredientMap = new Map(
+        (Array.isArray(translatedRecipe?.ingredientTranslations)
+          ? translatedRecipe.ingredientTranslations
+          : []
+        )
+          .map((item) => ({
+            key: normalizeEnglishText(item?.englishName),
+            value: item,
+          }))
+          .filter((item) => item.key)
+          .map((item) => [item.key, item.value]),
+      )
+
+      const { matchedIngredients, missingIngredients } = splitMatchedAndMissingIngredients({
+        ingredients: meal.ingredients,
+        pantryEnglishSet,
+        translatedIngredientMap,
+      })
+
+      const translatedName = String(translatedRecipe?.tarifAdi ?? '').trim()
+      const imageUrl = await NanoBananaImageTool({
+        mealNameTr: translatedName,
+        mealNameEn: meal.strMeal,
+        fallbackImageUrl: meal.strMealThumb,
+      })
+
+      return {
+        tarifAdi: translatedName || meal.strMeal,
+        kisaAciklama:
+          String(translatedRecipe?.kisaAciklama ?? '').trim() ||
+          'Mevcut stokla hizli sekilde hazirlanabilen dengeli bir tarif.',
+        tahminiSuresi: String(translatedRecipe?.tahminiSuresi ?? '').trim() || '30-45 dakika',
+        goruntuUrl: imageUrl,
+        matchedIngredients,
+        missingIngredients,
+        pisirmeAdimlari:
+          Array.isArray(translatedRecipe?.pisirmeAdimlari) && translatedRecipe.pisirmeAdimlari.length
+            ? translatedRecipe.pisirmeAdimlari.map((step) => String(step ?? '').trim()).filter(Boolean)
+            : buildCookingStepsFallback(meal.strInstructions),
+      }
+    }),
+  )
+
+  return { tarifler }
 }

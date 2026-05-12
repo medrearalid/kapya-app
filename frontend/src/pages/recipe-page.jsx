@@ -1,19 +1,102 @@
-import { BadgeCheck, Lightbulb, Sparkles } from 'lucide-react'
+import { BadgeCheck, Lightbulb, LoaderCircle, Sparkles } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getBudgetProfileLabelKey, usePantryStore } from '../store/pantry-store'
 import RecipeCard from '../components/RecipeCard'
+import TapButton from '../components/tap-button'
+import { generateWasteSaverRecipes } from '../services/recipe-agent-api'
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24
+
+const calculateDaysLeft = (dateValue) => {
+  const targetDate = new Date(dateValue)
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const startOfTarget = new Date(
+    targetDate.getFullYear(),
+    targetDate.getMonth(),
+    targetDate.getDate(),
+  )
+
+  return Math.ceil((startOfTarget - startOfToday) / MS_PER_DAY)
+}
 
 function RecipePage() {
   const { t } = useTranslation()
   const selectedBudgetProfile = usePantryStore((state) => state.selectedBudgetProfile)
   const products = usePantryStore((state) => state.products)
   const generatedRecipes = usePantryStore((state) => state.generatedRecipes)
+  const recentRecipeNames = usePantryStore((state) => state.recentRecipeNames)
   const agentInsight = usePantryStore((state) => state.agentInsight)
+  const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
+  const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
+  const addRecentRecipeNames = usePantryStore((state) => state.addRecentRecipeNames)
+
+  const [isRefreshingRecipes, setIsRefreshingRecipes] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
+
+  const urgentProducts = useMemo(
+    () =>
+      products.filter((product) => {
+        const daysLeft = calculateDaysLeft(product.estimatedShelfLifeEndDate)
+        return daysLeft >= 0 && daysLeft <= 2
+      }),
+    [products],
+  )
+  const hasUrgentProducts = urgentProducts.length > 0
 
   const ingredientPreview = products.slice(0, 4).map((product) => product.name)
   const selectedBudgetProfileLabel = t(getBudgetProfileLabelKey(selectedBudgetProfile))
   const savingsAmount = Math.max(0, Math.round(Number(agentInsight?.tasarrufEdilenTutar) || 0))
   const hasAgentInsight = Boolean(agentInsight?.ajanMesaji) || savingsAmount > 0
+
+  const handleRefreshRecipes = async () => {
+    if (isRefreshingRecipes) {
+      return
+    }
+
+    setIsRefreshingRecipes(true)
+    setRefreshError('')
+    setAgentInsight(null)
+
+    const agentInstruction = hasUrgentProducts
+      ? 'Bu acil urunleri merkeze alarak israf onleyici tarif uret.'
+      : 'Buzdolabindaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
+    const requestMode = hasUrgentProducts ? 'waste-prevent' : 'daily-profile'
+
+    try {
+      const recipeData = await generateWasteSaverRecipes({
+        budgetProfile: selectedBudgetProfile,
+        pantryStock: products,
+        urgentProducts,
+        agentInstruction,
+        requestMode,
+        recentRecipeNames,
+      })
+
+      const recipeList = Array.isArray(recipeData?.tarifler) ? recipeData.tarifler : []
+      if (recipeList.length === 0) {
+        throw new Error('RECIPE_GENERATION_FAILED')
+      }
+
+      setGeneratedRecipes(recipeList)
+      addRecentRecipeNames(
+        recipeList.map((recipe) => String(recipe?.tarifAdi ?? '').trim()).filter(Boolean),
+      )
+      setAgentInsight({
+        tasarrufEdilenTutar: Number(recipeData?.tasarrufEdilenTutar) || 0,
+        ajanMesaji: String(recipeData?.ajanMesaji ?? '').trim(),
+      })
+    } catch (error) {
+      setRefreshError(
+        error?.message === 'RECIPE_GENERATION_FAILED'
+          ? t('recipes.refreshError')
+          : error?.message || t('recipes.refreshError'),
+      )
+    } finally {
+      setIsRefreshingRecipes(false)
+    }
+  }
 
   return (
     <section className="space-y-4">
@@ -53,6 +136,28 @@ function RecipePage() {
             : t('recipes.skeletonDescription')}
         </p>
       </article>
+
+      <TapButton
+        type="button"
+        onClick={handleRefreshRecipes}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-kapya-200/65 bg-kapya-50/80 px-4 py-3 text-sm font-semibold text-kapya-800 transition hover:bg-kapya-100 dark:border-kapya-900/45 dark:bg-kapya-950/25 dark:text-kapya-200 dark:hover:bg-kapya-900/35"
+      >
+        {isRefreshingRecipes ? (
+          <>
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+            {t('recipes.refreshLoading')}
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {t('recipes.refreshButton')}
+          </>
+        )}
+      </TapButton>
+
+      {refreshError ? (
+        <p className="text-xs text-kapya-900 dark:text-kapya-300">{refreshError}</p>
+      ) : null}
 
       {hasAgentInsight ? (
         <article className="glass-panel soft-card rounded-2xl border border-emerald-200/75 bg-gradient-to-br from-emerald-50/90 via-white to-emerald-100/80 p-4 dark:border-emerald-900/50 dark:from-emerald-950/35 dark:via-slate-900/45 dark:to-emerald-900/30">

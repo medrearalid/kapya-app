@@ -32,7 +32,9 @@ function DashboardPage() {
   const navigate = useNavigate()
   const selectedBudgetProfile = usePantryStore((state) => state.selectedBudgetProfile)
   const products = usePantryStore((state) => state.products)
+  const recentRecipeNames = usePantryStore((state) => state.recentRecipeNames)
   const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
+  const addRecentRecipeNames = usePantryStore((state) => state.addRecentRecipeNames)
   const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
 
   const [isGeneratingRecipes, setIsGeneratingRecipes] = useState(false)
@@ -86,6 +88,7 @@ function DashboardPage() {
         urgentProducts,
         agentInstruction,
         requestMode,
+        recentRecipeNames,
       })
 
       const recipeList = Array.isArray(recipeData?.tarifler) ? recipeData.tarifler : []
@@ -94,6 +97,9 @@ function DashboardPage() {
       }
 
       setGeneratedRecipes(recipeList)
+      addRecentRecipeNames(
+        recipeList.map((recipe) => String(recipe?.tarifAdi ?? '').trim()).filter(Boolean),
+      )
       setAgentInsight({
         tasarrufEdilenTutar: Number(recipeData?.tasarrufEdilenTutar) || 0,
         ajanMesaji: String(recipeData?.ajanMesaji ?? '').trim(),

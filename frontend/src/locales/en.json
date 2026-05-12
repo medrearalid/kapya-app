@@ -97,7 +97,10 @@
     "ingredientBase": "Base for 1 serving: {{amount}} {{unit}}",
     "cookButton": "Cook This Recipe",
     "wasteHint": "Automatically deducted from stock, less waste.",
-    "toastSaved": "Nice! You saved by using what you already had."
+    "toastSaved": "Nice! You saved by using what you already had.",
+    "refreshButton": "I Didn't Like These / Find Another Recipe",
+    "refreshLoading": "Preparing new alternatives...",
+    "refreshError": "Something went wrong while fetching new recipes."
   },
   "settings": {
     "badge": "Settings",

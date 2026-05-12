@@ -97,7 +97,10 @@
     "ingredientBase": "1 kişilik baz: {{amount}} {{unit}}",
     "cookButton": "Bu Tarifi Pişir",
     "wasteHint": "Stoktan otomatik düşülür, israf önlenir.",
-    "toastSaved": "Harika! Malzemeleri değerlendirerek tasarruf ettin."
+    "toastSaved": "Harika! Malzemeleri değerlendirerek tasarruf ettin.",
+    "refreshButton": "Bunları Beğenmedim / Başka Tarif Bul",
+    "refreshLoading": "Yeni alternatifler hazırlanıyor...",
+    "refreshError": "Yeni tarifler getirilirken bir sorun oluştu."
   },
   "settings": {
     "badge": "Ayarlar",

@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import './utils/i18n'
 import RootLayout from './components/root-layout'
+import GlobalErrorDisplay from './components/GlobalErrorDisplay'
 import DashboardPage from './pages/dashboard-page'
 import PantryPage from './pages/pantry-page'
 import RecipePage from './pages/recipe-page'
@@ -13,6 +14,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <RootLayout />,
+    errorElement: <GlobalErrorDisplay />,
     children: [
       {
         index: true,
