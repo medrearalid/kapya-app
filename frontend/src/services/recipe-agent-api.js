@@ -37,3 +37,24 @@ export const generateWasteSaverRecipes = async ({
 
   return responsePayload?.data
 }
+
+export const generateRecipeByName = async ({ mealName }) => {
+  const payload = {
+    mealName,
+  }
+
+  const response = await fetch(buildApiUrl('/api/ai/recipes/by-name'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const responsePayload = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(responsePayload?.error || 'RECIPE_BY_NAME_FAILED')
+  }
+
+  return responsePayload?.data?.tarif || null
+}

@@ -50,17 +50,32 @@ const normalizeIngredient = (ingredient) => ({
 })
 
 const normalizeRecipe = (recipe) => ({
+  id: String(recipe?.id ?? '').trim(),
   tarifAdi: String(recipe?.tarifAdi ?? '').trim(),
   kisaAciklama: String(recipe?.kisaAciklama ?? '').trim(),
   tahminiSure: String(recipe?.tahminiSure ?? recipe?.tahminiSuresi ?? '').trim(),
-  goruntuUrl: String(recipe?.goruntuUrl ?? '').trim(),
-  matchedIngredients: (Array.isArray(recipe?.matchedIngredients) ? recipe.matchedIngredients : [])
+  goruntuUrl: String(recipe?.goruntuUrl ?? recipe?.nanoBananaGorseli ?? '').trim(),
+  ortalamaKalori: String(recipe?.ortalamaKalori ?? recipe?.kalori ?? '').trim(),
+  porsiyon: String(recipe?.porsiyon ?? '').trim(),
+  zorluk: String(recipe?.zorluk ?? '').trim(),
+  pufNoktasi: (Array.isArray(recipe?.pufNoktasi) ? recipe.pufNoktasi : recipe?.pufNoktalari || [])
+    .map((tip) => String(tip ?? '').trim())
+    .filter(Boolean),
+  matchedIngredients: (
+    Array.isArray(recipe?.matchedIngredients)
+      ? recipe.matchedIngredients
+      : recipe?.malzemeler?.matched || []
+  )
     .map(normalizeIngredient)
     .filter((ingredient) => ingredient.isim),
-  missingIngredients: (Array.isArray(recipe?.missingIngredients) ? recipe.missingIngredients : [])
+  missingIngredients: (
+    Array.isArray(recipe?.missingIngredients)
+      ? recipe.missingIngredients
+      : recipe?.malzemeler?.missing || []
+  )
     .map(normalizeIngredient)
     .filter((ingredient) => ingredient.isim),
-  pisirmeAdimlari: (Array.isArray(recipe?.pisirmeAdimlari) ? recipe.pisirmeAdimlari : [])
+  pisirmeAdimlari: (Array.isArray(recipe?.pisirmeAdimlari) ? recipe.pisirmeAdimlari : recipe?.adimlar || [])
     .map((step) => String(step ?? '').trim())
     .filter(Boolean),
 })

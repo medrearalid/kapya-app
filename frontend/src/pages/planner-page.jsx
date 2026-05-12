@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import PlannedMealCard from '../components/planned-meal-card'
 import { usePlannerStore } from '../store/planner-store'
 import { usePantryStore } from '../store/pantry-store'
+import { useRecipeStore } from '../store/recipe-store'
 
 const mealTypeOrder = ['ogle', 'aksam']
 
@@ -57,9 +59,11 @@ const getDayLabel = (dateKey, t, language) => {
 
 function PlannerPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const plannedMeals = usePlannerStore((state) => state.plannedMeals)
   const markPlannedMealCompleted = usePlannerStore((state) => state.markPlannedMealCompleted)
   const removePlannedMeal = usePlannerStore((state) => state.removePlannedMeal)
+  const saveRecipe = useRecipeStore((state) => state.saveRecipe)
   const consumeRecipeIngredients = usePantryStore((state) => state.consumeRecipeIngredients)
   const showToast = usePantryStore((state) => state.showToast)
 
@@ -116,6 +120,16 @@ function PlannerPage() {
     showToast(t('planner.completedToast', { name: plannedMeal?.recipe?.tarifAdi || t('planner.meal') }))
   }
 
+  const handleOpenMealDetail = (plannedMeal) => {
+    const savedRecipe = saveRecipe(plannedMeal?.recipe, {
+      source: 'planner',
+    })
+
+    if (savedRecipe?.id) {
+      navigate(`/recipes/${savedRecipe.id}`)
+    }
+  }
+
   return (
     <section className="space-y-4 pb-20">
       <header>
@@ -151,6 +165,7 @@ function PlannerPage() {
                     <PlannedMealCard
                       key={meal.id}
                       meal={meal}
+                      onOpenDetail={handleOpenMealDetail}
                       onCookMeal={handleCookMeal}
                       onRemoveMeal={removePlannedMeal}
                     />

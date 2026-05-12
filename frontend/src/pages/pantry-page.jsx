@@ -3,13 +3,14 @@ import { Camera, LoaderCircle, Minus, Plus, Trash2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import TapButton from '../components/tap-button'
-import { productUnitOptions, usePantryStore } from '../store/pantry-store'
+import { KATEGORI_OPTIONS, productUnitOptions, usePantryStore } from '../store/pantry-store'
 import { analyzeReceiptImage } from '../services/receipt-api'
 
 const initialForm = {
   name: '',
   quantity: '',
   unit: 'adet',
+  kategori: 'Diğer',
 }
 
 const listContainerVariants = {
@@ -42,19 +43,33 @@ const toDraftReceiptItems = (items) =>
     quantity: String(item?.quantity ?? ''),
     unit: String(item?.unit ?? 'adet').trim() || 'adet',
     estimatedShelfLifeDays: Number(item?.estimatedShelfLifeDays ?? 7),
+    kategori: String(item?.kategori ?? '').trim() || 'Diğer',
   }))
 
 const getQuantityStepByUnit = (unit) => {
-  if (unit === 'gram' || unit === 'mililitre') {
+  if (unit === 'gram') {
     return 50
   }
 
-  if (unit === 'kilogram' || unit === 'litre') {
+  if (unit === 'litre') {
     return 0.25
   }
 
   return 1
 }
+
+const RECEIPT_UNIT_OPTIONS = ['adet', 'gram', 'paket', 'litre', 'var']
+
+const CATEGORY_ORDER = [
+  'Sebzeler',
+  'Meyveler',
+  'Et ve Tavuk',
+  'S\u00fct \u00dcr\u00fcnleri',
+  'Baharatlar',
+  'Temel G\u0131da',
+  'At\u0131\u015ft\u0131rmal\u0131klar',
+  'Di\u011fer',
+]
 
 function PantryPage() {
   const { t } = useTranslation()
@@ -76,12 +91,21 @@ function PantryPage() {
     [products],
   )
 
+  const groupedProducts = useMemo(() => {
+    const groups = {}
+    sortedProducts.forEach((p) => {
+      const key = p.kategori || 'Di\u011fer'
+      if (!groups[key]) groups[key] = []
+      groups[key].push(p)
+    })
+    const ordered = CATEGORY_ORDER.filter((cat) => groups[cat]).map((cat) => [cat, groups[cat]])
+    const extra = Object.entries(groups).filter(([k]) => !CATEGORY_ORDER.includes(k))
+    return [...ordered, ...extra]
+  }, [sortedProducts])
+
   const handleInputChange = (event) => {
     const { name, value } = event.target
-    setFormValues((current) => ({
-      ...current,
-      [name]: value,
-    }))
+    setFormValues((current) => ({ ...current, [name]: value }))
   }
 
   const handleSubmit = (event) => {
@@ -90,6 +114,7 @@ function PantryPage() {
       name: formValues.name,
       quantity: formValues.quantity,
       unit: formValues.unit,
+      kategori: formValues.kategori,
     })
     setFormValues(initialForm)
   }
@@ -112,9 +137,7 @@ function PantryPage() {
   const handleReceiptPick = async (event) => {
     const selectedFile = event.target.files?.[0]
     event.target.value = ''
-    if (!selectedFile) {
-      return
-    }
+    if (!selectedFile) return
 
     setIsAnalyzingReceipt(true)
     setReceiptError('')
@@ -123,9 +146,7 @@ function PantryPage() {
       const imageBase64 = await convertFileToBase64(selectedFile)
       const analyzedProducts = await analyzeReceiptImage({ imageBase64 })
 
-      if (analyzedProducts.length === 0) {
-        throw new Error('RECEIPT_ANALYZE_FAILED')
-      }
+      if (analyzedProducts.length === 0) throw new Error('RECEIPT_ANALYZE_FAILED')
 
       setPendingReceiptItems(toDraftReceiptItems(analyzedProducts))
     } catch (error) {
@@ -168,16 +189,15 @@ function PantryPage() {
         const name = String(item?.name ?? '').trim()
         const quantity = Number(item?.quantity)
         const shelfLifeDays = Number(item?.estimatedShelfLifeDays)
-        if (!name || !Number.isFinite(quantity) || quantity <= 0) {
-          return null
-        }
+        if (!name || !Number.isFinite(quantity) || quantity <= 0) return null
 
         return {
           name,
           quantity,
-          unit: productUnitOptions.includes(item?.unit) ? item.unit : 'adet',
+          unit: RECEIPT_UNIT_OPTIONS.includes(item?.unit) ? item.unit : 'adet',
           estimatedShelfLifeDays:
             Number.isFinite(shelfLifeDays) && shelfLifeDays > 0 ? Math.round(shelfLifeDays) : 7,
+          kategori: item?.kategori || 'Di\u011fer',
         }
       })
       .filter(Boolean)
@@ -195,9 +215,7 @@ function PantryPage() {
 
   const handleAdjustProductQuantity = (product, direction) => {
     const baseQuantity = Number(product?.quantity)
-    if (!Number.isFinite(baseQuantity)) {
-      return
-    }
+    if (!Number.isFinite(baseQuantity)) return
 
     const step = getQuantityStepByUnit(product?.unit)
     const nextQuantity = roundToTwo(baseQuantity + step * direction)
@@ -206,10 +224,7 @@ function PantryPage() {
       return
     }
 
-    updateProductQuantity({
-      id: product.id,
-      quantity: nextQuantity,
-    })
+    updateProductQuantity({ id: product.id, quantity: nextQuantity })
   }
 
   const handleUploadButtonClick = () => {
@@ -217,7 +232,7 @@ function PantryPage() {
   }
 
   return (
-    <section className="space-y-4 pb-20">
+    <section className="space-y-4 pb-6">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sand-700 dark:text-slate-400">
           {t('pantry.badge')}
@@ -226,6 +241,30 @@ function PantryPage() {
           {t('pantry.title')}
         </h1>
       </header>
+
+      <TapButton
+        type="button"
+        onClick={handleUploadButtonClick}
+        disabled={isAnalyzingReceipt}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-kapya-700 disabled:bg-kapya-300"
+      >
+        {isAnalyzingReceipt ? (
+          <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
+        ) : (
+          <Camera className="h-5 w-5" aria-hidden="true" />
+        )}
+        <span>{t('pantry.receipt.fabButton')}</span>
+      </TapButton>
+
+      {isAnalyzingReceipt ? (
+        <p className="text-center text-xs font-semibold text-kapya-700 dark:text-kapya-300">
+          {t('pantry.receipt.loadingMessage')}
+        </p>
+      ) : null}
+
+      {receiptError ? (
+        <p className="text-center text-xs text-kapya-800 dark:text-kapya-300">{receiptError}</p>
+      ) : null}
 
       <article className="glass-panel soft-card rounded-2xl p-4">
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sand-700 dark:text-slate-400">
@@ -267,6 +306,19 @@ function PantryPage() {
               ))}
             </select>
           </div>
+          <select
+            name="kategori"
+            value={formValues.kategori}
+            onChange={handleInputChange}
+            className="w-full rounded-xl border border-white/55 bg-white/70 px-3 py-2.5 text-sm text-sand-900 outline-none ring-kapya-200 focus:ring-2 dark:border-slate-600/75 dark:bg-slate-800/65 dark:text-slate-100"
+            aria-label={t('pantry.categoryLabel')}
+          >
+            {KATEGORI_OPTIONS.map((kat) => (
+              <option key={kat} value={kat}>
+                {kat}
+              </option>
+            ))}
+          </select>
           <TapButton
             type="submit"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-sage-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sage-700"
@@ -322,9 +374,9 @@ function PantryPage() {
                       className="w-full rounded-xl border border-white/55 bg-white/70 px-3 py-2.5 text-sm text-sand-900 outline-none ring-kapya-200 focus:ring-2 dark:border-slate-600/75 dark:bg-slate-800/65 dark:text-slate-100"
                       aria-label={t('pantry.unitLabel')}
                     >
-                      {productUnitOptions.map((unit) => (
+                      {RECEIPT_UNIT_OPTIONS.map((unit) => (
                         <option key={unit} value={unit}>
-                          {t(`pantry.units.${unit}`)}
+                          {t(`pantry.units.${unit}`, { defaultValue: unit })}
                         </option>
                       ))}
                     </select>
@@ -365,58 +417,67 @@ function PantryPage() {
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-sand-700 dark:text-slate-400">
           {t('pantry.listTitle')}
         </h2>
-        {sortedProducts.length > 0 ? (
-          <motion.ul
-            className="mt-3 space-y-2"
-            variants={listContainerVariants}
-            initial="hidden"
-            animate="show"
-          >
-            {sortedProducts.map((product) => (
-              <motion.li
-                key={product.id}
-                variants={listItemVariants}
-                className="glass-panel flex items-center justify-between rounded-xl border border-white/55 bg-white/62 px-3 py-2 dark:border-slate-700/65 dark:bg-slate-800/62"
-              >
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-sand-900 dark:text-slate-100">
-                    {product.name}
-                  </p>
-                  <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-white/50 bg-white/70 px-2 py-1 dark:border-slate-600/70 dark:bg-slate-700/70">
-                    <TapButton
-                      type="button"
-                      onClick={() => handleAdjustProductQuantity(product, -1)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
-                      aria-label={t('pantry.decreaseQuantityAria', { name: product.name })}
-                    >
-                      <Minus className="h-4 w-4" aria-hidden="true" />
-                    </TapButton>
-                    <span className="min-w-24 text-center text-sm font-semibold text-sand-900 dark:text-slate-100">
-                      {product.quantity} {product.unit}
-                    </span>
-                    <TapButton
-                      type="button"
-                      onClick={() => handleAdjustProductQuantity(product, 1)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
-                      aria-label={t('pantry.increaseQuantityAria', { name: product.name })}
-                    >
-                      <Plus className="h-4 w-4" aria-hidden="true" />
-                    </TapButton>
-                  </div>
-                </div>
-                <TapButton
-                  type="button"
-                  onClick={() => removeProduct(product.id)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/75 text-kapya-700 dark:bg-slate-700/70 dark:text-kapya-200"
-                  aria-label={t('pantry.deleteProductAria', { name: product.name })}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </TapButton>
-              </motion.li>
-            ))}
-          </motion.ul>
-        ) : (
+        {sortedProducts.length === 0 ? (
           <p className="mt-3 text-sm text-sand-700 dark:text-slate-300">{t('pantry.emptyState')}</p>
+        ) : (
+          <div className="mt-2 space-y-4">
+            {groupedProducts.map(([category, items]) => (
+              <div key={category}>
+                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-sand-500 dark:text-slate-500">
+                  {category}
+                </h3>
+                <motion.ul
+                  className="space-y-1.5"
+                  variants={listContainerVariants}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {items.map((product) => (
+                    <motion.li
+                      key={product.id}
+                      variants={listItemVariants}
+                      className="glass-panel flex items-center justify-between rounded-xl border border-white/55 bg-white/62 px-3 py-2 dark:border-slate-700/65 dark:bg-slate-800/62"
+                    >
+                      <p className="text-sm font-medium text-sand-900 dark:text-slate-100">
+                        {product.name}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1 rounded-lg border border-white/50 bg-white/70 px-1.5 py-1 dark:border-slate-600/70 dark:bg-slate-700/70">
+                          <TapButton
+                            type="button"
+                            onClick={() => handleAdjustProductQuantity(product, -1)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
+                            aria-label={t('pantry.decreaseQuantityAria', { name: product.name })}
+                          >
+                            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+                          </TapButton>
+                          <span className="min-w-16 text-center text-xs font-semibold text-sand-900 dark:text-slate-100">
+                            {product.quantity} {product.unit}
+                          </span>
+                          <TapButton
+                            type="button"
+                            onClick={() => handleAdjustProductQuantity(product, 1)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/80 text-kapya-700 dark:bg-slate-800 dark:text-kapya-200"
+                            aria-label={t('pantry.increaseQuantityAria', { name: product.name })}
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                          </TapButton>
+                        </div>
+                        <TapButton
+                          type="button"
+                          onClick={() => removeProduct(product.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/75 text-kapya-700 dark:bg-slate-700/70 dark:text-kapya-200"
+                          aria-label={t('pantry.deleteProductAria', { name: product.name })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </TapButton>
+                      </div>
+                    </motion.li>
+                  ))}
+                </motion.ul>
+              </div>
+            ))}
+          </div>
         )}
       </article>
 
@@ -428,28 +489,6 @@ function PantryPage() {
         className="hidden"
         onChange={handleReceiptPick}
       />
-
-      <TapButton
-        type="button"
-        onClick={handleUploadButtonClick}
-        disabled={isAnalyzingReceipt}
-        className="animate-kapya-pulse fixed bottom-24 right-5 z-40 inline-flex h-14 min-w-14 items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 text-sm font-semibold text-white shadow-float transition hover:bg-kapya-700 disabled:animate-none disabled:bg-kapya-300"
-      >
-        {isAnalyzingReceipt ? (
-          <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
-        ) : (
-          <Camera className="h-5 w-5" aria-hidden="true" />
-        )}
-        <span>{t('pantry.receipt.fabButton')}</span>
-      </TapButton>
-
-      {isAnalyzingReceipt ? (
-        <p className="text-xs font-semibold text-kapya-700 dark:text-kapya-300">
-          {t('pantry.receipt.loadingMessage')}
-        </p>
-      ) : null}
-
-      {receiptError ? <p className="text-xs text-kapya-800 dark:text-kapya-300">{receiptError}</p> : null}
     </section>
   )
 }

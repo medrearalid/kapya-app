@@ -8,11 +8,9 @@ const RECEIPT_CLASSIFIER_MODEL =
 const RECEIPT_ALLOWED_UNITS = new Set([
   'adet',
   'gram',
-  'kilogram',
   'paket',
-  'bag',
   'litre',
-  'mililitre',
+  'var',
 ])
 
 const RECEIPT_NON_FOOD_KEYWORDS = [
@@ -103,8 +101,9 @@ const receiptResponseJsonSchema = {
       quantity: { type: 'number' },
       unit: { type: 'string' },
       estimatedShelfLifeDays: { type: 'number' },
+      kategori: { type: 'string' },
     },
-    required: ['name', 'quantity', 'unit', 'estimatedShelfLifeDays'],
+    required: ['name', 'quantity', 'unit', 'estimatedShelfLifeDays', 'kategori'],
   },
 }
 
@@ -248,24 +247,16 @@ const parseReceiptJsonResponse = (rawText) => {
       return 'gram'
     }
 
-    if (['kilogram', 'kg', 'kilo'].includes(normalizedUnit)) {
-      return 'kilogram'
-    }
-
     if (['paket', 'pkt', 'pk'].includes(normalizedUnit)) {
       return 'paket'
-    }
-
-    if (['bag', 'bag', 'demet'].includes(normalizedUnit)) {
-      return 'bag'
     }
 
     if (['litre', 'lt', 'l'].includes(normalizedUnit)) {
       return 'litre'
     }
 
-    if (['mililitre', 'ml'].includes(normalizedUnit)) {
-      return 'mililitre'
+    if (['var', 'mevcut'].includes(normalizedUnit)) {
+      return 'var'
     }
 
     return ''
@@ -293,6 +284,7 @@ const parseReceiptJsonResponse = (rawText) => {
       estimatedShelfLifeDays: Number(
         item?.estimatedShelfLifeDays ?? item?.tahminiRafOmruGun ?? 0,
       ),
+      kategori: String(item?.kategori ?? '').trim() || 'Diğer',
     }))
     .filter((item) => {
       const normalizedName = normalizeReceiptText(item.name)
@@ -420,15 +412,16 @@ export const analyzeReceiptImage = async ({ imageBase64 }) => {
 
   const prompt = [
     'Bu gorsel bir market/perakende satis fisidir.',
-    'Sadece buzdolabina veya mutfak stok yonetimine uygun temel malzemeleri cikart.',
+    'Sadece buzdolabina veya mutfak stok yonetimine uygun temel gida malzemelerini cikart.',
     'Hazir tuketime uygun urunleri ASLA ekleme (ornek: yas pasta, tatli, sandvic, hazir yemek).',
     'Gida disi urunleri ASLA ekleme (ornek: bardak, tabak, mutfak esyasi, temizlik urunu).',
     'Emin degilsen urunu hic ekleme.',
-    'Her urun icin sadece su alanlari dondur: name, quantity, unit, estimatedShelfLifeDays.',
-    'name kisa ve standart bir urun adi olsun.',
-    'quantity pozitif bir sayi olsun.',
-    'unit sadece su degerlerden biri olsun: adet, gram, kilogram, paket, bag, litre, mililitre.',
-    'estimatedShelfLifeDays pozitif sayi olsun.',
+    'Her urun icin su alanlari dondur: name, quantity, unit, estimatedShelfLifeDays, kategori.',
+    'KURAL 1 - URUN ADI: Fisteki tum kisaltmalari ve kodlari duzelterek temiz Turkce ile yaz; sadece ilk harfi buyuk olsun (Ornek: "DMT 1KG"->"Domates", "YMR"->"Yumurta", "ZYT YAG 0.75L"->"Zeytinyagi").',
+    'KURAL 2 - BIRIM: ASLA kilogram veya kg kullanma; tum kilograms grama donustur (Ornek: 1.5 kg->1500 gram, 500 g->500 gram). Kabul edilen birimler: adet, gram, paket, litre, var.',
+    'KURAL 3 - BAHARAT: Baharat turundeki her urun (tuz, karabiber, kimyon, pul biber vs.) icin quantity=1 ve unit="var" kullan.',
+    'KURAL 4 - KATEGORI: Her urune su kategorilerden birini ata: Sebzeler, Meyveler, Et ve Tavuk, Sut Urunleri, Baharatlar, Atistirmaliklar, Temel Gida, Diger.',
+    'KURAL 5: estimatedShelfLifeDays pozitif sayi olsun.',
     'Sonucu sadece JSON dizisi olarak dondur.',
   ].join(' ')
 

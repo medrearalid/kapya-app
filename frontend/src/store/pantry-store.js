@@ -22,14 +22,22 @@ const budgetProfileOptions = [
   },
 ]
 
+export const KATEGORI_OPTIONS = [
+  'Sebzeler',
+  'Meyveler',
+  'Et ve Tavuk',
+  'Süt Ürünleri',
+  'Baharatlar',
+  'Atıştırmalıklar',
+  'Temel Gıda',
+  'Diğer',
+]
+
 export const productUnitOptions = [
   'adet',
   'gram',
-  'kilogram',
   'paket',
-  'bag',
   'litre',
-  'mililitre',
 ]
 
 const daysFromNow = (days) => {
@@ -203,6 +211,7 @@ const createDefaultProducts = () => [
     name: 'Makarna',
     quantity: 2,
     unit: 'paket',
+    kategori: 'Temel Gıda',
     estimatedShelfLifeEndDate: daysFromNow(180),
     addedAt: Date.now(),
     updatedAt: Date.now(),
@@ -212,6 +221,7 @@ const createDefaultProducts = () => [
     name: 'Yumurta',
     quantity: 10,
     unit: 'adet',
+    kategori: 'Temel Gıda',
     estimatedShelfLifeEndDate: daysFromNow(9),
     addedAt: Date.now(),
     updatedAt: Date.now(),
@@ -312,12 +322,16 @@ export const usePantryStore = create(
       const unit = normalizeUnit(productInput?.unit ?? 'adet')
       const estimatedShelfLifeEndDate =
         String(productInput?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(7)
+      const kategori = KATEGORI_OPTIONS.includes(productInput?.kategori)
+        ? productInput.kategori
+        : 'Diğer'
 
       const incomingProduct = {
         name,
         quantity,
         unit,
         estimatedShelfLifeEndDate,
+        kategori,
       }
 
       return {
@@ -337,12 +351,14 @@ export const usePantryStore = create(
           const quantity = toPositiveNumber(item?.quantity, 1)
           const unit = normalizeUnit(item?.unit ?? 'adet')
           const shelfLifeDays = toPositiveNumber(item?.estimatedShelfLifeDays, 7)
+          const kategori = KATEGORI_OPTIONS.includes(item?.kategori) ? item.kategori : 'Diğer'
 
           return {
             name,
             quantity,
             unit,
             estimatedShelfLifeEndDate: daysFromNow(Math.round(shelfLifeDays)),
+            kategori,
           }
         })
         .filter(Boolean)

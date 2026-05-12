@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import { useTranslation } from 'react-i18next'
 import TapButton from './tap-button'
 
-function PlannedMealCard({ meal, onCookMeal, onRemoveMeal }) {
+function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
   const { t } = useTranslation()
 
   return (
@@ -13,7 +13,7 @@ function PlannedMealCard({ meal, onCookMeal, onRemoveMeal }) {
         meal.completed ? 'opacity-70' : '',
       ].join(' ')}
     >
-      <div className="flex gap-3">
+      <TapButton type="button" onClick={() => onOpenDetail(meal)} className="flex w-full gap-3 text-left">
         <img
           src={meal?.recipe?.goruntuUrl || ''}
           alt={meal?.recipe?.tarifAdi || t('planner.meal')}
@@ -27,7 +27,7 @@ function PlannedMealCard({ meal, onCookMeal, onRemoveMeal }) {
             {t('planner.portionInfo', { count: meal.portionSize })}
           </p>
         </div>
-      </div>
+      </TapButton>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <TapButton
@@ -75,6 +75,7 @@ PlannedMealCard.propTypes = {
       goruntuUrl: PropTypes.string,
     }),
   }).isRequired,
+  onOpenDetail: PropTypes.func.isRequired,
   onCookMeal: PropTypes.func.isRequired,
   onRemoveMeal: PropTypes.func.isRequired,
 }

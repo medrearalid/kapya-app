@@ -289,4 +289,4 @@ Opsiyonel degiskenler:
 
 ## Lisans
 
-Bu repository icin ayri bir LICENSE dosyasi bulunmuyorsa, varsayilan kullanim kosullari repository sahibi tarafindan belirlenir.
+Copyright (c) 2026 REG. Tüm hakları saklıdır. Bu projenin kaynak kodları yalnızca BTK Akademi Hackathon 2026 değerlendirme süreci için incelemeye açılmıştır. Kaynak kodların veya projenin kopyalanması, çoğaltılması veya ticari amaçlarla kullanılması kesinlikle yasaktır.

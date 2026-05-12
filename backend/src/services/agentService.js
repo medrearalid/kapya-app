@@ -290,6 +290,40 @@ const GenerateRecipeTool = async ({
   return parseLooseJson(readLlmText(llmResponse))
 }
 
+const buildGenerateRecipeByNamePrompt = ({ mealName }) => {
+  const payload = {
+    mealName: String(mealName ?? '').trim(),
+  }
+
+  return [
+    'SYSTEM:',
+    'Sen yalnizca Turk ve Anadolu mutfaginin geleneksel tekniklerine hakim uzman bir sefsin.',
+    'Kullanicidan yalnizca yemek ismini alir, o yemegin en dogru ve uygulanabilir tarifini verirsin.',
+    '',
+    'KRITIK CIKTI KURALLARI:',
+    '1) Yanit STRICT JSON olmalidir, markdown veya aciklama yazma.',
+    '2) JSON sadece su semaya uymali:',
+    '{"tarif":{"tarifAdi":"string","kisaAciklama":"string","tahminiSure":"string","porsiyon":"string","zorluk":"string","ortalamaKalori":"string","pufNoktasi":["string"],"matchedIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"missingIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"pisirmeAdimlari":["string"]}}',
+    '3) pufNoktasi en az 3 madde olmali.',
+    '4) pisirmeAdimlari 6-10 adim arasinda olmali.',
+    '5) matchedIngredients en az 6 adet olmali.',
+    '6) missingIngredients 0-4 adet olabilir.',
+    '7) Tarif pratik ama geleneksel teknige sadik olmali.',
+    '',
+    `GIRDI: ${JSON.stringify(payload)}`,
+  ].join('\n')
+}
+
+const GenerateRecipeByNameTool = async ({ llm, mealName }) => {
+  const llmResponse = await llm.invoke(
+    buildGenerateRecipeByNamePrompt({
+      mealName,
+    }),
+  )
+
+  return parseLooseJson(readLlmText(llmResponse))
+}
+
 const translateRecipeNameToEnglish = async ({ llm, mealNameTr }) => {
   const sourceName = String(mealNameTr ?? '').trim()
   if (!sourceName) {
@@ -569,6 +603,81 @@ const normalizeGeneratedRecipe = ({ recipe, pantryStock }) => {
   }
 }
 
+const normalizeChefTips = (tips) => {
+  if (Array.isArray(tips)) {
+    return tips
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean)
+      .slice(0, 6)
+  }
+
+  const text = String(tips ?? '').trim()
+  if (!text) {
+    return []
+  }
+
+  return text
+    .split(/\n|\u2022|\*/g)
+    .map((item) => item.replace(/^[-\d.)\s]+/g, '').trim())
+    .filter(Boolean)
+    .slice(0, 6)
+}
+
+const normalizeNamedRecipe = ({ mealName, recipe }) => {
+  const recipeName = String(recipe?.tarifAdi ?? mealName ?? '').trim() || 'Sef Onerisi'
+  const matchedIngredients = sanitizeIngredientList(recipe?.matchedIngredients)
+  const missingIngredients = sanitizeIngredientList(recipe?.missingIngredients).slice(0, 4)
+  const pisirmeAdimlari = (Array.isArray(recipe?.pisirmeAdimlari) ? recipe.pisirmeAdimlari : [])
+    .map((step) => String(step ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 10)
+  const pufNoktasi = normalizeChefTips(recipe?.pufNoktasi ?? recipe?.pufNoktalari)
+
+  return {
+    tarifAdi: recipeName,
+    kisaAciklama:
+      String(recipe?.kisaAciklama ?? '').trim() ||
+      `${recipeName} icin geleneksel tekniklerle dengelenmis pratik bir tarif.`,
+    tahminiSure:
+      String(recipe?.tahminiSure ?? recipe?.tahminiSuresi ?? '').trim() || '45 dakika',
+    porsiyon: String(recipe?.porsiyon ?? '').trim() || '2-4 kisilik',
+    zorluk: String(recipe?.zorluk ?? '').trim() || 'Orta',
+    ortalamaKalori: String(recipe?.ortalamaKalori ?? '').trim() || '420 kcal / porsiyon',
+    pufNoktasi:
+      pufNoktasi.length > 0
+        ? pufNoktasi
+        : [
+            'Malzemeleri pisirmeden once oda sicakligina getir.',
+            'Sos dengesini kontrollu tuzlama ile son asamada kur.',
+            'Servisten once 2-3 dakika dinlendirerek aroma butunlugunu artir.',
+          ],
+    matchedIngredients:
+      matchedIngredients.length > 0
+        ? matchedIngredients
+        : [
+            { isim: recipeName, miktar: '500', birim: 'gram' },
+            { isim: 'sogan', miktar: '1', birim: 'adet' },
+            { isim: 'zeytinyagi', miktar: '2', birim: 'yemek kasigi' },
+            { isim: 'tuz', miktar: '1', birim: 'cay kasigi' },
+            { isim: 'karabiber', miktar: '1/2', birim: 'cay kasigi' },
+            { isim: 'su', miktar: '1', birim: 'su bardagi' },
+          ],
+    missingIngredients,
+    pisirmeAdimlari:
+      pisirmeAdimlari.length > 0
+        ? pisirmeAdimlari
+        : [
+            'Adim 1: Tum malzemeleri yikayip dograyarak mise-en-place hazirla.',
+            'Adim 2: Tencerede yagi isitip sogani saydamlasana kadar cevir.',
+            `Adim 3: ${recipeName} ana malzemesini kontrollu ateste muhurlerek lezzeti yogunlastir.`,
+            'Adim 4: Baharat ve sicak suyu ekleyip kapagi kapali sekilde pisir.',
+            'Adim 5: Kivami kontrol edip gerekirse kisa sure dinlendir.',
+            'Adim 6: Sicak servis ederek son dokunusu yap.',
+          ],
+    goruntuUrl: String(recipe?.goruntuUrl ?? '').trim() || buildInlinePlaceholderImage(recipeName),
+  }
+}
+
 export const executeKapyaAgent = async ({
   budgetProfile,
   pantryStock,
@@ -622,5 +731,36 @@ export const executeKapyaAgent = async ({
 
   return {
     tarifler: enrichedRecipes,
+  }
+}
+
+export const executeRecipeByNameAgent = async ({ mealName }) => {
+  const normalizedMealName = String(mealName ?? '').trim()
+  if (!normalizedMealName) {
+    return { tarif: null }
+  }
+
+  const llm = getLlmClient()
+
+  const generated = await GenerateRecipeByNameTool({
+    llm,
+    mealName: normalizedMealName,
+  }).catch(() => null)
+
+  const rawRecipe = generated?.tarif && typeof generated.tarif === 'object' ? generated.tarif : generated
+  const normalizedRecipe = normalizeNamedRecipe({
+    mealName: normalizedMealName,
+    recipe: rawRecipe,
+  })
+
+  return {
+    tarif: {
+      ...normalizedRecipe,
+      goruntuUrl: await NanoBananaImageTool({
+        llm,
+        mealNameTr: normalizedRecipe.tarifAdi,
+        fallbackImageUrl: normalizedRecipe.goruntuUrl,
+      }),
+    },
   }
 }

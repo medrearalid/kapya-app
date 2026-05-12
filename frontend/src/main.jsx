@@ -8,6 +8,7 @@ import GlobalErrorDisplay from './components/GlobalErrorDisplay'
 import DashboardPage from './pages/dashboard-page'
 import PantryPage from './pages/pantry-page'
 import PlannerPage from './pages/planner-page'
+import RecipeDetailPage from './pages/recipe-detail-page'
 import RecipePage from './pages/recipe-page'
 import SettingsPage from './pages/settings-page'
 
@@ -28,6 +29,10 @@ const router = createBrowserRouter([
       {
         path: 'recipes',
         element: <RecipePage />,
+      },
+      {
+        path: 'recipes/:recipeId',
+        element: <RecipeDetailPage />,
       },
       {
         path: 'planner',

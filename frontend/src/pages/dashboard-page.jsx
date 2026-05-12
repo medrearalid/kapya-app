@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import TapButton from '../components/tap-button'
 import { getBudgetProfileLabelKey, usePantryStore } from '../store/pantry-store'
+import { useRecipeStore } from '../store/recipe-store'
 import { generateWasteSaverRecipes } from '../services/recipe-agent-api'
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24
@@ -36,6 +37,7 @@ function DashboardPage() {
   const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
   const addRecentRecipeNames = usePantryStore((state) => state.addRecentRecipeNames)
   const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
+  const saveRecipes = useRecipeStore((state) => state.saveRecipes)
 
   const [isGeneratingRecipes, setIsGeneratingRecipes] = useState(false)
   const [loadingStepIndex, setLoadingStepIndex] = useState(0)
@@ -54,8 +56,7 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!isGeneratingRecipes) {
-      setLoadingStepIndex(0)
-      return
+      return undefined
     }
 
     const intervalId = setInterval(() => {
@@ -72,6 +73,7 @@ function DashboardPage() {
       return
     }
 
+    setLoadingStepIndex(0)
     setIsGeneratingRecipes(true)
     setRequestError('')
     setAgentInsight(null)
@@ -96,6 +98,9 @@ function DashboardPage() {
         throw new Error('RECIPE_GENERATION_FAILED')
       }
 
+      saveRecipes(recipeList, {
+        source: 'waste-saver',
+      })
       setGeneratedRecipes(recipeList)
       addRecentRecipeNames(
         recipeList.map((recipe) => String(recipe?.tarifAdi ?? '').trim()).filter(Boolean),
