@@ -35,7 +35,6 @@ function DashboardPage() {
   const products = usePantryStore((state) => state.products)
   const recentRecipeNames = usePantryStore((state) => state.recentRecipeNames)
   const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
-  const addRecentRecipeNames = usePantryStore((state) => state.addRecentRecipeNames)
   const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
   const saveRecipes = useRecipeStore((state) => state.saveRecipes)
 
@@ -93,18 +92,21 @@ function DashboardPage() {
         recentRecipeNames,
       })
 
-      const recipeList = Array.isArray(recipeData?.tarifler) ? recipeData.tarifler : []
-      if (recipeList.length === 0) {
+      let generatedRecipe = null
+      if (recipeData?.tarif && typeof recipeData.tarif === 'object') {
+        generatedRecipe = recipeData.tarif
+      } else if (Array.isArray(recipeData?.tarifler)) {
+        generatedRecipe = recipeData.tarifler[0] || null
+      }
+
+      if (!generatedRecipe) {
         throw new Error('RECIPE_GENERATION_FAILED')
       }
 
-      saveRecipes(recipeList, {
+      saveRecipes([generatedRecipe], {
         source: 'waste-saver',
       })
-      setGeneratedRecipes(recipeList)
-      addRecentRecipeNames(
-        recipeList.map((recipe) => String(recipe?.tarifAdi ?? '').trim()).filter(Boolean),
-      )
+      setGeneratedRecipes([generatedRecipe])
       setAgentInsight({
         tasarrufEdilenTutar: Number(recipeData?.tasarrufEdilenTutar) || 0,
         ajanMesaji: String(recipeData?.ajanMesaji ?? '').trim(),

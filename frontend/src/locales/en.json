@@ -80,6 +80,7 @@
     "badge": "Recipes",
     "title": "AI Suggestions",
     "chefAssistantTitle": "Chef Assistant",
+    "chefSuggestionTitle": "Chef's Recommendation",
     "smartHubTitle": "Smart Chef Hub",
     "quickSearchLabel": "Quick Search",
     "quickSearchPlaceholder": "Ex: izmir kofte, lentil soup",
@@ -135,6 +136,8 @@
     "savingsBadge": "Savings Achieved",
     "savingsAmount": "{{amount}} TL",
     "savingsMessageFallback": "You unlocked about {{amount}} TL savings by using critical ingredients in time.",
+    "matchedCountBadge": "In stock {{count}}",
+    "missingCountBadge": "Missing {{count}}",
     "emptyTitle": "Recipe list is empty",
     "emptyDescription": "Tap 'Save Me From Waste / Generate Recipe' on Home to create suggestions.",
     "portionSize": "{{count}} servings",
@@ -153,8 +156,8 @@
     "planButton": "Plan This Recipe",
     "wasteHint": "Automatically deducted from stock, less waste.",
     "toastSaved": "Nice! You saved by using what you already had.",
-    "refreshButton": "I Didn't Like These / Find Another Recipe",
-    "refreshLoading": "Preparing new alternatives...",
+    "refreshButton": "I Didn't Like It, Suggest Something Else",
+    "refreshLoading": "Preparing a new suggestion...",
     "refreshError": "Something went wrong while fetching new recipes."
   },
   "planner": {

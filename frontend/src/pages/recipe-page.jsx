@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import TapButton from '../components/tap-button'
-import { generateRecipeByName } from '../services/recipe-agent-api'
+import { generateRecipeByName, generateWasteSaverRecipes } from '../services/recipe-agent-api'
 import { usePantryStore } from '../store/pantry-store'
 import { useRecipeStore } from '../store/recipe-store'
 
@@ -51,6 +51,8 @@ const LOADING_TEXT_KEYS = [
   'recipes.loadingFinalizing',
 ]
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24
+
 const CATEGORY_EMOJI_MAP = {
   sebzeler: '🍅',
   meyveler: '🍎',
@@ -63,6 +65,31 @@ const CATEGORY_EMOJI_MAP = {
 }
 
 const normalizeText = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
+
+const calculateDaysLeft = (dateValue) => {
+  const targetDate = new Date(dateValue)
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const startOfTarget = new Date(
+    targetDate.getFullYear(),
+    targetDate.getMonth(),
+    targetDate.getDate(),
+  )
+
+  return Math.ceil((startOfTarget - startOfToday) / MS_PER_DAY)
+}
+
+const extractWasteSaverRecipe = (recipeData) => {
+  if (recipeData?.tarif && typeof recipeData.tarif === 'object') {
+    return recipeData.tarif
+  }
+
+  if (Array.isArray(recipeData?.tarifler)) {
+    return recipeData.tarifler[0] || null
+  }
+
+  return null
+}
 
 const getCategoryLabel = (category) => {
   const normalizedCategory = normalizeText(category)
@@ -352,6 +379,70 @@ PreferenceDrawer.propTypes = {
   t: PropTypes.func.isRequired,
 }
 
+function ChefSuggestionCard({ recipe, onOpenDetail, t }) {
+  const matchedCount = Array.isArray(recipe?.matchedIngredients) ? recipe.matchedIngredients.length : 0
+  const missingCount = Array.isArray(recipe?.missingIngredients) ? recipe.missingIngredients.length : 0
+
+  return (
+    <TapButton
+      type="button"
+      onClick={onOpenDetail}
+      className="mx-auto block w-full max-w-2xl rounded-[2rem] text-left"
+    >
+      <article className="overflow-hidden rounded-[2rem] border border-white/65 bg-white/80 shadow-soft dark:border-slate-700/60 dark:bg-slate-900/70">
+        <div className="relative">
+          <img
+            src={recipe?.goruntuUrl || RECIPE_IMAGE_PLACEHOLDER}
+            alt={recipe?.tarifAdi || 'Sefin Onerisi'}
+            className="h-[320px] w-full object-cover sm:h-[420px]"
+            onError={(event) => {
+              event.currentTarget.onerror = null
+              event.currentTarget.src = RECIPE_IMAGE_PLACEHOLDER
+            }}
+            loading="lazy"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+          <div className="absolute inset-x-0 bottom-0 p-4 text-white sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/85">
+              {t('recipes.chefSuggestionTitle')}
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{recipe?.tarifAdi}</h2>
+            <p className="mt-2 line-clamp-3 text-sm text-white/90 sm:text-base">{recipe?.kisaAciklama}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 p-4 sm:p-6">
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+            {recipe?.tahminiSure || '-'}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+            {t('recipes.matchedCountBadge', { count: matchedCount })}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-800 dark:bg-rose-950/50 dark:text-rose-200">
+            {t('recipes.missingCountBadge', { count: missingCount })}
+          </span>
+        </div>
+      </article>
+    </TapButton>
+  )
+}
+
+ChefSuggestionCard.propTypes = {
+  recipe: PropTypes.shape({
+    tarifAdi: PropTypes.string,
+    kisaAciklama: PropTypes.string,
+    tahminiSure: PropTypes.string,
+    goruntuUrl: PropTypes.string,
+    matchedIngredients: PropTypes.array,
+    missingIngredients: PropTypes.array,
+  }).isRequired,
+  onOpenDetail: PropTypes.func.isRequired,
+  t: PropTypes.func.isRequired,
+}
+
 function RecipeLibrarySection({ recipeList, viewMode, setViewMode, onSelectRecipe, t }) {
   const isLibraryEmpty = recipeList.length === 0
   const isGridMode = viewMode === VIEW_MODES.GRID
@@ -529,7 +620,13 @@ RecipeLibrarySection.propTypes = {
 function RecipePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const selectedBudgetProfile = usePantryStore((state) => state.selectedBudgetProfile)
   const pantryProducts = usePantryStore((state) => state.products)
+  const recentRecipeNames = usePantryStore((state) => state.recentRecipeNames)
+  const generatedRecipes = usePantryStore((state) => state.generatedRecipes)
+  const addRecentRecipeNames = usePantryStore((state) => state.addRecentRecipeNames)
+  const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
+  const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
   const savedRecipes = useRecipeStore((state) => state.savedRecipes)
   const saveRecipe = useRecipeStore((state) => state.saveRecipe)
 
@@ -541,7 +638,9 @@ function RecipePage() {
   const [isFocusedIngredientsOpen, setIsFocusedIngredientsOpen] = useState(false)
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
   const [requestError, setRequestError] = useState('')
+  const [refreshError, setRefreshError] = useState('')
   const [isLoadingRecipe, setIsLoadingRecipe] = useState(false)
+  const [isRefreshingChefSuggestion, setIsRefreshingChefSuggestion] = useState(false)
   const [loadingStepIndex, setLoadingStepIndex] = useState(0)
 
   const loadingTexts = useMemo(() => LOADING_TEXT_KEYS.map((key) => t(key)), [t])
@@ -570,6 +669,18 @@ function RecipePage() {
         .filter(Boolean),
     [preferences, t],
   )
+  const featuredRecipe = useMemo(
+    () => (Array.isArray(generatedRecipes) ? generatedRecipes[0] || null : null),
+    [generatedRecipes],
+  )
+  const urgentProducts = useMemo(
+    () =>
+      pantryProducts.filter((product) => {
+        const daysLeft = calculateDaysLeft(product.estimatedShelfLifeEndDate)
+        return daysLeft >= 0 && daysLeft <= 2
+      }),
+    [pantryProducts],
+  )
 
   const recipeList = useMemo(
     () =>
@@ -592,6 +703,79 @@ function RecipePage() {
       globalThis.window.clearInterval(intervalId)
     }
   }, [isLoadingRecipe])
+
+  const handleOpenFeaturedRecipe = () => {
+    if (!featuredRecipe || typeof featuredRecipe !== 'object') {
+      return
+    }
+
+    const savedRecipe = saveRecipe(featuredRecipe, {
+      source: 'waste-saver',
+    })
+
+    if (savedRecipe?.id) {
+      navigate(`/recipes/${savedRecipe.id}`)
+    }
+  }
+
+  const handleRefreshChefSuggestion = async () => {
+    if (isRefreshingChefSuggestion) {
+      return
+    }
+
+    const currentRecipeName = String(featuredRecipe?.tarifAdi ?? '').trim()
+    if (!currentRecipeName) {
+      return
+    }
+
+    setRefreshError('')
+    setIsRefreshingChefSuggestion(true)
+
+    addRecentRecipeNames([currentRecipeName])
+
+    const requestRecentRecipeNames = [...recentRecipeNames, currentRecipeName]
+      .map((name) => String(name ?? '').trim())
+      .filter(Boolean)
+
+    const agentInstruction =
+      urgentProducts.length > 0
+        ? 'Bu acil urunleri merkeze alarak israf onleyici tarif uret.'
+        : 'Buzdolabindaki urunleri kullanarak profile uygun gunluk bir tarif uret.'
+    const requestMode = urgentProducts.length > 0 ? 'waste-prevent' : 'daily-profile'
+
+    try {
+      const recipeData = await generateWasteSaverRecipes({
+        budgetProfile: selectedBudgetProfile,
+        pantryStock: pantryProducts,
+        urgentProducts,
+        agentInstruction,
+        requestMode,
+        recentRecipeNames: requestRecentRecipeNames,
+      })
+
+      const nextRecipe = extractWasteSaverRecipe(recipeData)
+      if (!nextRecipe) {
+        throw new Error('RECIPE_GENERATION_FAILED')
+      }
+
+      saveRecipe(nextRecipe, {
+        source: 'waste-saver',
+      })
+      setGeneratedRecipes([nextRecipe])
+      setAgentInsight({
+        tasarrufEdilenTutar: Number(recipeData?.tasarrufEdilenTutar) || 0,
+        ajanMesaji: String(recipeData?.ajanMesaji ?? '').trim(),
+      })
+    } catch (error) {
+      setRefreshError(
+        error?.message === 'RECIPE_GENERATION_FAILED'
+          ? t('recipes.refreshError')
+          : error?.message || t('recipes.refreshError'),
+      )
+    } finally {
+      setIsRefreshingChefSuggestion(false)
+    }
+  }
 
   const toggleFocusedIngredient = (ingredientName) => {
     setFocusedIngredients((currentIngredients) => {
@@ -677,6 +861,34 @@ function RecipePage() {
           {t('recipes.smartHubTitle')}
         </h1>
       </header>
+
+      {featuredRecipe ? (
+        <section className="space-y-3">
+          <ChefSuggestionCard recipe={featuredRecipe} onOpenDetail={handleOpenFeaturedRecipe} t={t} />
+
+          <TapButton
+            type="button"
+            onClick={handleRefreshChefSuggestion}
+            disabled={isRefreshingChefSuggestion}
+            className="mx-auto inline-flex w-full max-w-2xl items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-80 dark:bg-kapya-700 dark:hover:bg-kapya-600"
+          >
+            {isRefreshingChefSuggestion ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                {t('recipes.refreshLoading')}
+              </>
+            ) : (
+              t('recipes.refreshButton')
+            )}
+          </TapButton>
+
+          {refreshError ? (
+            <p className="mx-auto max-w-2xl text-xs font-semibold text-kapya-900 dark:text-kapya-300">
+              {refreshError}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <article className="glass-panel rounded-3xl border border-white/60 bg-white/65 p-3 dark:border-slate-700/65 dark:bg-slate-900/70">
         <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">

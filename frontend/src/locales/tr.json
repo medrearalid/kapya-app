@@ -80,6 +80,7 @@
     "badge": "Tarif",
     "title": "Yapay Zeka Önerileri",
     "chefAssistantTitle": "Sef Asistani",
+    "chefSuggestionTitle": "Sefin Onerisi",
     "smartHubTitle": "Smart Chef Hub",
     "quickSearchLabel": "Hizli Arama",
     "quickSearchPlaceholder": "Orn: izmir kofte, mercimek corbasi",
@@ -135,6 +136,8 @@
     "savingsBadge": "Tasarruf Edildi",
     "savingsAmount": "{{amount}} TL",
     "savingsMessageFallback": "Kritik ürünleri kullanarak yaklaşık {{amount}} TL tasarruf ettin.",
+    "matchedCountBadge": "Stokta {{count}}",
+    "missingCountBadge": "Eksik {{count}}",
     "emptyTitle": "Tarif listesi boş",
     "emptyDescription": "Ana ekrandan 'Beni İsraftan Kurtar / Tarif Üret' butonuna basarak yeni tarifler oluştur.",
     "portionSize": "{{count}} kişilik",
@@ -153,8 +156,8 @@
     "planButton": "Bu Tarifi Planla",
     "wasteHint": "Stoktan otomatik düşülür, israf önlenir.",
     "toastSaved": "Harika! Malzemeleri değerlendirerek tasarruf ettin.",
-    "refreshButton": "Bunları Beğenmedim / Başka Tarif Bul",
-    "refreshLoading": "Yeni alternatifler hazırlanıyor...",
+    "refreshButton": "Beğenmedim, Başka Bir Şey Öner",
+    "refreshLoading": "Yeni öneri hazırlanıyor...",
     "refreshError": "Yeni tarifler getirilirken bir sorun oluştu."
   },
   "planner": {

@@ -24,7 +24,8 @@ const buildInlinePlaceholderImage = (title) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
-const NANO_BANANA_FALLBACK_IMAGE = buildInlinePlaceholderImage('Kapya Recipe')
+const ELEGANT_FALLBACK_IMAGE_URL =
+  'https://images.unsplash.com/photo-1495521821757-a1efb6729352?q=80&w=800&auto=format&fit=crop'
 
 const MIN_MISSING_INGREDIENTS = 2
 const MAX_MISSING_INGREDIENTS = 3
@@ -203,11 +204,15 @@ const ensureMissingIngredients = ({ missingIngredients, pantryNameSet, usedNameS
   return filtered.slice(0, MAX_MISSING_INGREDIENTS)
 }
 
-const buildFallbackRecipes = ({ pantryStock }) => {
+const buildFallbackRecipe = ({ pantryStock, recentRecipeNames }) => {
   const normalizedStock = sanitizeProductList(pantryStock)
   if (normalizedStock.length === 0) {
-    return []
+    return null
   }
+
+  const recentRecipeNameSet = new Set(
+    sanitizeStringList(recentRecipeNames).map((recipeName) => normalizeText(recipeName)),
+  )
 
   const fallbackPool = [
     { name: 'Menemen', sure: '20 dakika' },
@@ -215,33 +220,34 @@ const buildFallbackRecipes = ({ pantryStock }) => {
     { name: 'Tavuk Sote', sure: '30 dakika' },
   ]
 
-  return fallbackPool.map((item, index) => {
-    const baseProduct = normalizedStock[index % normalizedStock.length]
+  const selectedFallback =
+    fallbackPool.find((item) => !recentRecipeNameSet.has(normalizeText(item.name))) || fallbackPool[0]
 
-    return {
-      tarifAdi: item.name,
-      kisaAciklama: `${baseProduct.name} merkezli, hizli hazirlanan pratik bir ev yemegi.`,
-      tahminiSure: item.sure,
-      goruntuUrl: buildInlinePlaceholderImage(item.name),
-      matchedIngredients: [
-        {
-          isim: baseProduct.name,
-          miktar: String(Math.max(1, Number(baseProduct.quantity) || 1)),
-          birim: baseProduct.unit || 'adet',
-        },
-      ],
-      missingIngredients: [
-        { isim: 'zeytinyagi', miktar: '1', birim: 'yemek kasigi' },
-        { isim: 'tuz', miktar: '1', birim: 'cay kasigi' },
-      ],
-      pisirmeAdimlari: [
-        'Adim 1: Malzemeleri yikayip dograyin.',
-        'Adim 2: Tavayi isitip ana malzemeyi pisirmeye baslayin.',
-        'Adim 3: Baharatlari ekleyip lezzeti dengeleyin.',
-        'Adim 4: Yemegi sicak servis edin.',
-      ],
-    }
-  })
+  const baseProduct = normalizedStock[0]
+
+  return {
+    tarifAdi: selectedFallback.name,
+    kisaAciklama: `${baseProduct.name} merkezli, hizli hazirlanan pratik bir ev yemegi.`,
+    tahminiSure: selectedFallback.sure,
+    goruntuUrl: buildInlinePlaceholderImage(selectedFallback.name),
+    matchedIngredients: [
+      {
+        isim: baseProduct.name,
+        miktar: String(Math.max(1, Number(baseProduct.quantity) || 1)),
+        birim: baseProduct.unit || 'adet',
+      },
+    ],
+    missingIngredients: [
+      { isim: 'zeytinyagi', miktar: '1', birim: 'yemek kasigi' },
+      { isim: 'tuz', miktar: '1', birim: 'cay kasigi' },
+    ],
+    pisirmeAdimlari: [
+      'Adim 1: Malzemeleri yikayip dograyin.',
+      'Adim 2: Tavayi isitip ana malzemeyi pisirmeye baslayin.',
+      'Adim 3: Baharatlari ekleyip lezzeti dengeleyin.',
+      'Adim 4: Yemegi sicak servis edin.',
+    ],
+  }
 }
 
 const getLlmClient = () => {
@@ -259,30 +265,40 @@ const getLlmClient = () => {
   })
 }
 
-const buildGenerateRecipePrompt = ({ budgetProfile, pantryStock, urgentProducts, agentInstruction }) => {
+const buildGenerateRecipePrompt = ({
+  budgetProfile,
+  pantryStock,
+  urgentProducts,
+  agentInstruction,
+  requestMode,
+  recentRecipeNames,
+}) => {
   const payload = {
     budgetProfile: String(budgetProfile ?? '').trim(),
     pantryStock: sanitizeProductList(pantryStock),
     urgentProducts: sanitizeProductList(urgentProducts),
     agentInstruction: String(agentInstruction ?? '').trim(),
+    requestMode: String(requestMode ?? '').trim(),
+    recentRecipeNames: sanitizeStringList(recentRecipeNames),
   }
 
   return [
     'SYSTEM:',
     'Sen sadece Turk mutfagina ve Turkiye\'deki damak tadina hakim uzman bir sefsin.',
     'Asla cikolata ile zeytinyagi gibi birbiriyle uyumsuz, mantiksiz malzemeleri ayni tarifte birlestirme (Halusinasyon YASAK).',
-    'Buzdolabindaki malzemeleri merkeze alarak 3 gercekci, pratik Turk yemegi veya evrensel ev yemegi oner.',
+    'Buzdolabindaki malzemeleri merkeze alarak filtrelere en uygun SADECE 1 gercekci, pratik Turk yemegi veya evrensel ev yemegi oner.',
     '',
     'KRITIK CIKTI KURALLARI:',
     '1) Yanit STRICT JSON olmalidir, markdown veya aciklama yazma.',
     '2) JSON sadece su semaya uymali:',
-    '{"tarifler":[{"tarifAdi":"string","kisaAciklama":"string","tahminiSure":"string","goruntuUrl":"string","matchedIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"missingIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"pisirmeAdimlari":["string"]}]}',
-    '3) Tam olarak 3 tarif dondur.',
+    '{"tarif":{"tarifAdi":"string","kisaAciklama":"string","tahminiSure":"string","goruntuUrl":"string","matchedIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"missingIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"pisirmeAdimlari":["string"]}}',
+    '3) Tam olarak 1 tarif dondur.',
     '4) matchedIngredients yalnizca kullanicinin dolabinda olanlardan olusmali.',
-    `5) missingIngredients her tarifte zorunlu olmali, en az ${MIN_MISSING_INGREDIENTS} en fazla ${MAX_MISSING_INGREDIENTS} adet olmali ve dolapta olmamali.`,
-    '6) Tarifler gercek hayatta yapilabilir, dengeli ve mantikli olmali.',
+    `5) missingIngredients zorunlu olmali, en az ${MIN_MISSING_INGREDIENTS} en fazla ${MAX_MISSING_INGREDIENTS} adet olmali ve dolapta olmamali.`,
+    '6) Tarif gercek hayatta yapilabilir, dengeli ve mantikli olmali.',
     '7) Pisirme adimlari 4-7 adim olmali.',
     '8) goruntuUrl alanini bos string dondurebilirsin.',
+    '9) recentRecipeNames listesinde olan tarif adlarinin aynisini tekrar dondurme.',
     '',
     `GIRDI: ${JSON.stringify(payload)}`,
   ].join('\n')
@@ -294,6 +310,8 @@ const GenerateRecipeTool = async ({
   pantryStock,
   urgentProducts,
   agentInstruction,
+  requestMode,
+  recentRecipeNames,
 }) => {
   const llmResponse = await llm.invoke(
     buildGenerateRecipePrompt({
@@ -301,6 +319,8 @@ const GenerateRecipeTool = async ({
       pantryStock,
       urgentProducts,
       agentInstruction,
+      requestMode,
+      recentRecipeNames,
     }),
   )
 
@@ -488,6 +508,18 @@ const extractNanoBananaImageFromPayload = (payload) => {
   return base64Image || ''
 }
 
+const isQuotaExceededError = (error) => {
+  const status = Number(error?.status)
+  const message = String(error?.message ?? '').toLocaleLowerCase('en-US')
+  return (
+    status === 429 ||
+    message.includes('429') ||
+    message.includes('quota') ||
+    message.includes('resource exhausted') ||
+    message.includes('rate limit')
+  )
+}
+
 const generateImageWithGemini = async ({ prompt }) => {
   const apiKey = getGeminiApiKey()
   if (!apiKey) {
@@ -518,6 +550,10 @@ const generateImageWithGemini = async ({ prompt }) => {
       return `data:${mimeType};base64,${imageBytes}`
     }
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      throw error
+    }
+
     console.warn('[image-generation] Gemini image model failed, falling back.', {
       model: IMAGE_MODEL_NAME,
       message: String(error?.message ?? error),
@@ -575,17 +611,17 @@ const fetchImageAsDataUri = async (url) => {
 }
 
 const NanoBananaImageTool = async ({ llm, mealNameTr, fallbackImageUrl }) => {
-  const apiUrl = String(process.env.NANO_BANANA_API_URL ?? '').trim()
-  const apiKey = String(process.env.NANO_BANANA_API_KEY ?? '').trim()
-  const translatedMealName = await translateRecipeNameToEnglish({
-    llm,
-    mealNameTr,
-  })
+  try {
+    const apiUrl = String(process.env.NANO_BANANA_API_URL ?? '').trim()
+    const apiKey = String(process.env.NANO_BANANA_API_KEY ?? '').trim()
+    const translatedMealName = await translateRecipeNameToEnglish({
+      llm,
+      mealNameTr,
+    })
 
-  const prompt = `Professional food photography of ${translatedMealName}, served on an elegant matte ceramic plate, top-down view, rustic wooden table background, cinematic studio lighting, hyper-realistic, 4k resolution, appetizing, Michelin star presentation style, highly detailed.`
+    const prompt = `Professional food photography of ${translatedMealName}, served on an elegant matte ceramic plate, top-down view, rustic wooden table background, cinematic studio lighting, hyper-realistic, 4k resolution, appetizing, Michelin star presentation style, highly detailed.`
 
-  if (apiUrl && apiKey) {
-    try {
+    if (apiUrl && apiKey) {
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -601,6 +637,12 @@ const NanoBananaImageTool = async ({ llm, mealNameTr, fallbackImageUrl }) => {
         }),
       })
 
+      if (response.status === 429) {
+        const quotaError = new Error('NanoBanana API quota exceeded.')
+        quotaError.status = 429
+        throw quotaError
+      }
+
       if (response.ok) {
         const payload = await response.json().catch(() => null)
         const imageFromPayload = extractNanoBananaImageFromPayload(payload)
@@ -608,29 +650,40 @@ const NanoBananaImageTool = async ({ llm, mealNameTr, fallbackImageUrl }) => {
           return imageFromPayload
         }
       }
-    } catch {
-      // Intentionally silent: fallback path handles image generation.
     }
-  }
 
-  const geminiImage = await generateImageWithGemini({ prompt })
-  if (geminiImage) {
-    return geminiImage
-  }
+    const geminiImage = await generateImageWithGemini({ prompt })
+    if (geminiImage) {
+      return geminiImage
+    }
 
-  const keylessImageUrl = buildKeylessPromptImageUrl({ prompt, mealNameTr })
-  const keylessImageDataUri = await fetchImageAsDataUri(keylessImageUrl)
-  if (keylessImageDataUri) {
-    return keylessImageDataUri
-  }
+    const keylessImageUrl = buildKeylessPromptImageUrl({ prompt, mealNameTr })
+    const keylessImageDataUri = await fetchImageAsDataUri(keylessImageUrl)
+    if (keylessImageDataUri) {
+      return keylessImageDataUri
+    }
 
-  const stockFoodImageUrl = buildStockFoodImageUrl({ mealNameTr })
-  const stockFoodImageDataUri = await fetchImageAsDataUri(stockFoodImageUrl)
-  if (stockFoodImageDataUri) {
-    return stockFoodImageDataUri
-  }
+    const stockFoodImageUrl = buildStockFoodImageUrl({ mealNameTr })
+    const stockFoodImageDataUri = await fetchImageAsDataUri(stockFoodImageUrl)
+    if (stockFoodImageDataUri) {
+      return stockFoodImageDataUri
+    }
 
-  return String(fallbackImageUrl ?? '').trim() || buildInlinePlaceholderImage(mealNameTr)
+    return String(fallbackImageUrl ?? '').trim() || buildInlinePlaceholderImage(mealNameTr)
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      console.warn('[image-generation] Quota exceeded, using default fallback image.', {
+        status: Number(error?.status) || undefined,
+        message: String(error?.message ?? error),
+      })
+      return ELEGANT_FALLBACK_IMAGE_URL
+    }
+
+    console.warn('[image-generation] Image generation failed, using fallback image.', {
+      message: String(error?.message ?? error),
+    })
+    return String(fallbackImageUrl ?? '').trim() || ELEGANT_FALLBACK_IMAGE_URL
+  }
 }
 
 const normalizeGeneratedRecipe = ({ recipe, pantryStock }) => {
@@ -887,15 +940,21 @@ export const executeKapyaAgent = async ({
   pantryStock,
   urgentProducts,
   agentInstruction,
+  requestMode,
+  recentRecipeNames,
 }) => {
   const llm = getLlmClient()
 
   const normalizedPantryStock = sanitizeProductList(pantryStock)
   const normalizedUrgentProducts = sanitizeProductList(urgentProducts)
+  const normalizedRecentRecipeNames = sanitizeStringList(recentRecipeNames)
+  const recentRecipeNameSet = new Set(
+    normalizedRecentRecipeNames.map((recipeName) => normalizeText(recipeName)),
+  )
   const combinedStock = [...normalizedUrgentProducts, ...normalizedPantryStock]
 
   if (combinedStock.length === 0) {
-    return { tarifler: [] }
+    return { tarif: null }
   }
 
   const generated = await GenerateRecipeTool({
@@ -904,37 +963,48 @@ export const executeKapyaAgent = async ({
     pantryStock: combinedStock,
     urgentProducts: normalizedUrgentProducts,
     agentInstruction,
+    requestMode,
+    recentRecipeNames: normalizedRecentRecipeNames,
   }).catch(() => null)
 
-  const generatedRecipes = Array.isArray(generated?.tarifler) ? generated.tarifler : []
-  const normalizedRecipes = generatedRecipes
-    .map((recipe) => normalizeGeneratedRecipe({ recipe, pantryStock: combinedStock }))
-    .filter((recipe) => recipe.tarifAdi)
-
-  const fallbackRecipes = buildFallbackRecipes({ pantryStock: combinedStock })
-  const fallbackMap = new Map(
-    fallbackRecipes.map((recipe) => [normalizeText(recipe.tarifAdi), recipe]),
-  )
-
-  for (const recipe of normalizedRecipes) {
-    fallbackMap.delete(normalizeText(recipe.tarifAdi))
+  let rawGeneratedRecipe = null
+  if (generated?.tarif && typeof generated.tarif === 'object') {
+    rawGeneratedRecipe = generated.tarif
+  } else if (Array.isArray(generated?.tarifler)) {
+    rawGeneratedRecipe = generated.tarifler[0] || null
   }
 
-  const tarifler = [...normalizedRecipes, ...Array.from(fallbackMap.values())].slice(0, 3)
+  const normalizedGeneratedRecipe =
+    rawGeneratedRecipe && typeof rawGeneratedRecipe === 'object'
+      ? normalizeGeneratedRecipe({ recipe: rawGeneratedRecipe, pantryStock: combinedStock })
+      : null
 
-  const enrichedRecipes = await Promise.all(
-    tarifler.map(async (recipe) => ({
-      ...recipe,
-      goruntuUrl: await NanoBananaImageTool({
-        llm,
-        mealNameTr: recipe.tarifAdi,
-        fallbackImageUrl: recipe.goruntuUrl,
-      }),
-    })),
-  )
+  const shouldUseGeneratedRecipe =
+    Boolean(normalizedGeneratedRecipe?.tarifAdi) &&
+    !recentRecipeNameSet.has(normalizeText(normalizedGeneratedRecipe?.tarifAdi))
+
+  const selectedRecipe = shouldUseGeneratedRecipe
+    ? normalizedGeneratedRecipe
+    : buildFallbackRecipe({
+        pantryStock: combinedStock,
+        recentRecipeNames: normalizedRecentRecipeNames,
+      })
+
+  if (!selectedRecipe) {
+    return { tarif: null }
+  }
+
+  const enrichedRecipe = {
+    ...selectedRecipe,
+    goruntuUrl: await NanoBananaImageTool({
+      llm,
+      mealNameTr: selectedRecipe.tarifAdi,
+      fallbackImageUrl: selectedRecipe.goruntuUrl,
+    }),
+  }
 
   return {
-    tarifler: enrichedRecipes,
+    tarif: enrichedRecipe,
   }
 }
 
