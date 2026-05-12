@@ -7,9 +7,10 @@ import {
   TimerReset,
   Users,
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import MealPlanSheet from '../components/meal-plan-sheet'
 import TapButton from '../components/tap-button'
 import { usePantryStore } from '../store/pantry-store'
@@ -24,6 +25,7 @@ const getTodayDate = () => new Date().toISOString().slice(0, 10)
 
 function RecipeDetailPage() {
   const { t } = useTranslation()
+  const location = useLocation()
   const navigate = useNavigate()
   const { recipeId } = useParams()
   const savedRecipes = useRecipeStore((state) => state.savedRecipes)
@@ -42,6 +44,7 @@ function RecipeDetailPage() {
   )
 
   const plannerRecipe = useMemo(() => toPlannerRecipe(recipe), [recipe])
+  const hasSmartChefEntryAnimation = Boolean(location.state?.fromChefHub)
 
   if (!recipe) {
     return (
@@ -96,7 +99,12 @@ function RecipeDetailPage() {
   }
 
   return (
-    <section className="space-y-4 pb-32">
+    <motion.section
+      initial={hasSmartChefEntryAnimation ? { opacity: 0, y: 18, scale: 0.985 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.32, ease: 'easeOut' }}
+      className="space-y-4 pb-32"
+    >
       <div className="relative overflow-hidden rounded-3xl border border-white/55 bg-white/60 dark:border-slate-700/55 dark:bg-slate-900/60">
         <img
           src={recipe.nanoBananaGorseli || RECIPE_IMAGE_PLACEHOLDER}
@@ -296,7 +304,7 @@ function RecipeDetailPage() {
           saveButton: t('planner.saveButton'),
         }}
       />
-    </section>
+    </motion.section>
   )
 }
 

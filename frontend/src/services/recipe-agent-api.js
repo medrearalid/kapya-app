@@ -38,9 +38,31 @@ export const generateWasteSaverRecipes = async ({
   return responsePayload?.data
 }
 
-export const generateRecipeByName = async ({ mealName }) => {
+export const generateRecipeByName = async ({
+  mealName,
+  pantryStock,
+  focusedIngredients,
+  preferences,
+  isLucky,
+}) => {
   const payload = {
-    mealName,
+    mealName: String(mealName ?? '').trim(),
+  }
+
+  if (Array.isArray(pantryStock) && pantryStock.length > 0) {
+    payload.pantryStock = pantryStock
+  }
+
+  if (Array.isArray(focusedIngredients) && focusedIngredients.length > 0) {
+    payload.focusedIngredients = focusedIngredients
+  }
+
+  if (Array.isArray(preferences) && preferences.length > 0) {
+    payload.preferences = preferences
+  }
+
+  if (isLucky === true) {
+    payload.isLucky = true
   }
 
   const response = await fetch(buildApiUrl('/api/ai/recipes/by-name'), {

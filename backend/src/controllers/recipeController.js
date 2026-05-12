@@ -47,15 +47,53 @@ export const postWasteSaverRecipes = async (request, response, next) => {
 export const postGenerateRecipeByName = async (request, response, next) => {
   try {
     const mealName = String(request.body?.mealName ?? '').trim()
+    const pantryStock = request.body?.pantryStock
+    const focusedIngredients = request.body?.focusedIngredients
+    const preferences = request.body?.preferences
+    const isLucky = request.body?.isLucky === true
 
-    if (!mealName) {
+    if (pantryStock !== undefined && !Array.isArray(pantryStock)) {
       return response.status(400).json({
         success: false,
-        error: 'Gecersiz istek govdesi. mealName alani zorunludur.',
+        error: 'Gecersiz istek govdesi. pantryStock alani dizi olmalidir.',
       })
     }
 
-    const recipeData = await executeRecipeByNameAgent({ mealName })
+    if (focusedIngredients !== undefined && !Array.isArray(focusedIngredients)) {
+      return response.status(400).json({
+        success: false,
+        error: 'Gecersiz istek govdesi. focusedIngredients alani dizi olmalidir.',
+      })
+    }
+
+    if (preferences !== undefined && !Array.isArray(preferences)) {
+      return response.status(400).json({
+        success: false,
+        error: 'Gecersiz istek govdesi. preferences alani dizi olmalidir.',
+      })
+    }
+
+    const hasAnySmartCriteria =
+      Boolean(mealName) ||
+      isLucky ||
+      (Array.isArray(focusedIngredients) && focusedIngredients.length > 0) ||
+      (Array.isArray(preferences) && preferences.length > 0)
+
+    if (!hasAnySmartCriteria) {
+      return response.status(400).json({
+        success: false,
+        error:
+          'Gecersiz istek govdesi. mealName, isLucky, focusedIngredients veya preferences alanlarindan en az biri zorunludur.',
+      })
+    }
+
+    const recipeData = await executeRecipeByNameAgent({
+      mealName,
+      pantryStock,
+      focusedIngredients,
+      preferences,
+      isLucky,
+    })
 
     return response.status(200).json({
       success: true,
