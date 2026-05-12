@@ -52,7 +52,7 @@ const normalizeIngredient = (ingredient) => ({
 const normalizeRecipe = (recipe) => ({
   tarifAdi: String(recipe?.tarifAdi ?? '').trim(),
   kisaAciklama: String(recipe?.kisaAciklama ?? '').trim(),
-  tahminiSuresi: String(recipe?.tahminiSuresi ?? '').trim(),
+  tahminiSure: String(recipe?.tahminiSure ?? recipe?.tahminiSuresi ?? '').trim(),
   goruntuUrl: String(recipe?.goruntuUrl ?? '').trim(),
   matchedIngredients: (Array.isArray(recipe?.matchedIngredients) ? recipe.matchedIngredients : [])
     .map(normalizeIngredient)

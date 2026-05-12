@@ -1,88 +1,53 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
+import { GoogleGenAI } from '@google/genai'
 
-const MEAL_DB_BASE_URL = 'https://www.themealdb.com/api/json/v1/1'
-const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const TEXT_MODEL_NAME = process.env.GEMINI_TEXT_MODEL || 'gemini-3.1-flash-lite'
+const IMAGE_MODEL_NAME = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview'
 
-const NANO_BANANA_FALLBACK_IMAGE =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5J2nEAAAAASUVORK5CYII='
+const buildInlinePlaceholderImage = (title) => {
+  const safeTitle = String(title ?? 'Kapya Dish').trim().slice(0, 48) || 'Kapya Dish'
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="${safeTitle}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="50%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="430" r="190" fill="#ffffff" fill-opacity="0.88"/>
+  <text x="512" y="445" text-anchor="middle" font-size="82" font-family="Arial, sans-serif" fill="#92400e">KAPYA</text>
+  <text x="512" y="765" text-anchor="middle" font-size="44" font-family="Arial, sans-serif" fill="#78350f">${safeTitle}</text>
+</svg>`
 
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
+const NANO_BANANA_FALLBACK_IMAGE = buildInlinePlaceholderImage('Kapya Recipe')
+
+const MIN_MISSING_INGREDIENTS = 2
 const MAX_MISSING_INGREDIENTS = 3
 
-const TR_TO_EN_INGREDIENT_MAP = {
-  yumurta: 'egg',
-  sut: 'milk',
-  peynir: 'cheese',
-  yogurt: 'yogurt',
-  tereyagi: 'butter',
-  margarin: 'margarine',
-  zeytinyagi: 'olive oil',
-  aycicek_yagi: 'sunflower oil',
-  domates: 'tomato',
-  salatalik: 'cucumber',
-  biber: 'pepper',
-  patates: 'potato',
-  sogan: 'onion',
-  sarimsak: 'garlic',
-  havuc: 'carrot',
-  pirinc: 'rice',
-  makarna: 'pasta',
-  tavuk: 'chicken',
-  et: 'beef',
-  kiyma: 'minced beef',
-  nohut: 'chickpea',
-  mercimek: 'lentil',
-  fasulye: 'beans',
-  ekmek: 'bread',
-  un: 'flour',
-  seker: 'sugar',
-  tuz: 'salt',
-  karabiber: 'black pepper',
-  maydanoz: 'parsley',
-  dereotu: 'dill',
-  limon: 'lemon',
-}
-
-const UNIT_MAP = {
-  tbsp: 'yemek kasigi',
-  tablespoons: 'yemek kasigi',
-  tablespoon: 'yemek kasigi',
-  tsp: 'cay kasigi',
-  teaspoon: 'cay kasigi',
-  teaspoons: 'cay kasigi',
-  cup: 'su bardagi',
-  cups: 'su bardagi',
-  g: 'gram',
-  gram: 'gram',
-  grams: 'gram',
-  kg: 'kilogram',
-  ml: 'mililitre',
-  l: 'litre',
-  litre: 'litre',
-  liter: 'litre',
-  pinch: 'tutam',
-  cloves: 'dis',
-  clove: 'dis',
-  piece: 'adet',
-  pieces: 'adet',
-}
+const DEFAULT_MISSING_INGREDIENTS = [
+  { isim: 'zeytinyagi', miktar: '1', birim: 'yemek kasigi' },
+  { isim: 'tuz', miktar: '1', birim: 'cay kasigi' },
+  { isim: 'karabiber', miktar: '1/2', birim: 'cay kasigi' },
+  { isim: 'sogan', miktar: '1', birim: 'adet' },
+  { isim: 'sarimsak', miktar: '1', birim: 'dis' },
+  { isim: 'domates salcasi', miktar: '1', birim: 'yemek kasigi' },
+]
 
 const normalizeText = (value) =>
   String(value ?? '')
     .trim()
     .toLocaleLowerCase('tr-TR')
-    .replaceAll('ç', 'c')
-    .replaceAll('ğ', 'g')
-    .replaceAll('ı', 'i')
-    .replaceAll('ö', 'o')
-    .replaceAll('ş', 's')
-    .replaceAll('ü', 'u')
-
-const normalizeEnglishText = (value) =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9\s]/g, ' ')
-    .replaceAll(/\s+/g, ' ')
+    .replaceAll('\u00e7', 'c')
+    .replaceAll('\u011f', 'g')
+    .replaceAll('\u0131', 'i')
+    .replaceAll('\u00f6', 'o')
+    .replaceAll('\u015f', 's')
+    .replaceAll('\u00fc', 'u')
 
 const sanitizeProduct = (product) => ({
   name: String(product?.name ?? product?.urunAdi ?? '').trim(),
@@ -92,6 +57,8 @@ const sanitizeProduct = (product) => ({
 
 const sanitizeProductList = (products) =>
   (Array.isArray(products) ? products : []).map(sanitizeProduct).filter((item) => item.name)
+
+const getGeminiApiKey = () => String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim()
 
 const parseLooseJson = (rawValue) => {
   const text = String(rawValue ?? '').trim()
@@ -143,137 +110,125 @@ const readLlmText = (message) => {
   return ''
 }
 
-const fractionToNumber = (value) => {
-  const text = String(value ?? '').trim()
-  if (!text) {
-    return null
-  }
-
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    return Number(text)
-  }
-
-  if (/^\d+\/\d+$/.test(text)) {
-    const [numerator, denominator] = text.split('/').map(Number)
-    if (denominator === 0) {
-      return null
-    }
-    return numerator / denominator
-  }
-
-  if (/^\d+\s+\d+\/\d+$/.test(text)) {
-    const [whole, fraction] = text.split(' ')
-    const wholeNumber = Number(whole)
-    const fractionNumber = fractionToNumber(fraction)
-    if (!Number.isFinite(wholeNumber) || !Number.isFinite(fractionNumber)) {
-      return null
-    }
-    return wholeNumber + fractionNumber
-  }
-
-  return null
-}
-
-const parseMeasure = (measureText) => {
-  const raw = String(measureText ?? '').trim()
-  if (!raw) {
-    return { miktar: '1', birim: 'adet' }
-  }
-
-  const compact = raw.replaceAll(',', '.')
-  const match = /^([\d./\s]+)?\s*([A-Za-z]+)?/.exec(compact)
-  const amountCandidate = String(match?.[1] ?? '').trim()
-  const unitCandidate = normalizeEnglishText(match?.[2] ?? '')
-  const numericAmount = fractionToNumber(amountCandidate)
-  const miktar =
-    numericAmount === null
-      ? amountCandidate || '1'
-      : String(Number(numericAmount.toFixed(2)))
-
-  return {
-    miktar,
-    birim: UNIT_MAP[unitCandidate] || unitCandidate || 'adet',
-  }
-}
-
-const extractMealIngredients = (mealDetails) => {
-  const ingredients = []
-
-  for (let index = 1; index <= 20; index += 1) {
-    const englishName = String(mealDetails?.[`strIngredient${index}`] ?? '').trim()
-    if (!englishName) {
-      continue
-    }
-
-    const measure = String(mealDetails?.[`strMeasure${index}`] ?? '').trim()
-    ingredients.push({
-      englishName,
-      measure,
-      ...parseMeasure(measure),
-    })
-  }
-
-  return ingredients
-}
-
-const fetchJson = async (url) => {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`External API request failed: ${response.status}`)
-  }
-  return response.json()
-}
-
-const fetchMealIdsByIngredient = async (ingredientEnglish) => {
-  const queryValue = encodeURIComponent(String(ingredientEnglish ?? '').trim())
-  if (!queryValue) {
-    return []
-  }
-
-  const payload = await fetchJson(`${MEAL_DB_BASE_URL}/filter.php?i=${queryValue}`)
-  const meals = Array.isArray(payload?.meals) ? payload.meals : []
-  return meals
-    .map((meal) => String(meal?.idMeal ?? '').trim())
-    .filter(Boolean)
-}
-
-const fetchMealDetailById = async (mealId) => {
-  const payload = await fetchJson(`${MEAL_DB_BASE_URL}/lookup.php?i=${encodeURIComponent(mealId)}`)
-  const meal = Array.isArray(payload?.meals) ? payload.meals[0] : null
-  if (!meal) {
+const normalizeIngredient = (ingredient) => {
+  const isim = String(ingredient?.isim ?? ingredient?.name ?? '').trim()
+  if (!isim) {
     return null
   }
 
   return {
-    idMeal: String(meal.idMeal),
-    strMeal: String(meal.strMeal ?? '').trim(),
-    strMealThumb: String(meal.strMealThumb ?? '').trim(),
-    strInstructions: String(meal.strInstructions ?? '').trim(),
-    ingredients: extractMealIngredients(meal),
+    isim,
+    miktar: String(ingredient?.miktar ?? ingredient?.amount ?? '1').trim() || '1',
+    birim: String(ingredient?.birim ?? ingredient?.unit ?? 'adet').trim() || 'adet',
   }
 }
 
-const isIngredientInStock = (ingredientEnglish, pantryEnglishNames) => {
-  const normalizedIngredient = normalizeEnglishText(ingredientEnglish)
-  if (!normalizedIngredient) {
+const sanitizeIngredientList = (ingredients) =>
+  (Array.isArray(ingredients) ? ingredients : []).map(normalizeIngredient).filter(Boolean)
+
+const buildPantryNameSet = (pantryStock) =>
+  new Set(
+    sanitizeProductList(pantryStock)
+      .map((item) => normalizeText(item.name))
+      .filter(Boolean),
+  )
+
+const isIngredientInPantry = (ingredientName, pantryNameSet) => {
+  const normalized = normalizeText(ingredientName)
+  if (!normalized) {
     return false
   }
 
-  return pantryEnglishNames.some((pantryName) => {
+  return Array.from(pantryNameSet).some((pantryName) => {
     if (!pantryName) {
       return false
     }
 
-    if (pantryName === normalizedIngredient) {
+    if (pantryName === normalized) {
       return true
     }
 
-    return pantryName.includes(normalizedIngredient) || normalizedIngredient.includes(pantryName)
+    return pantryName.includes(normalized) || normalized.includes(pantryName)
+  })
+}
+
+const ensureMissingIngredients = ({ missingIngredients, pantryNameSet, usedNameSet }) => {
+  const filtered = missingIngredients
+    .filter((ingredient) => !isIngredientInPantry(ingredient.isim, pantryNameSet))
+    .filter((ingredient) => {
+      const key = normalizeText(ingredient.isim)
+      if (!key || usedNameSet.has(key)) {
+        return false
+      }
+      usedNameSet.add(key)
+      return true
+    })
+    .slice(0, MAX_MISSING_INGREDIENTS)
+
+  if (filtered.length >= MIN_MISSING_INGREDIENTS) {
+    return filtered
+  }
+
+  for (const candidate of DEFAULT_MISSING_INGREDIENTS) {
+    if (filtered.length >= MIN_MISSING_INGREDIENTS) {
+      break
+    }
+
+    const key = normalizeText(candidate.isim)
+    if (!key || pantryNameSet.has(key) || usedNameSet.has(key)) {
+      continue
+    }
+
+    usedNameSet.add(key)
+    filtered.push(candidate)
+  }
+
+  return filtered.slice(0, MAX_MISSING_INGREDIENTS)
+}
+
+const buildFallbackRecipes = ({ pantryStock }) => {
+  const normalizedStock = sanitizeProductList(pantryStock)
+  if (normalizedStock.length === 0) {
+    return []
+  }
+
+  const fallbackPool = [
+    { name: 'Menemen', sure: '20 dakika' },
+    { name: 'Mercimek Corbasi', sure: '35 dakika' },
+    { name: 'Tavuk Sote', sure: '30 dakika' },
+  ]
+
+  return fallbackPool.map((item, index) => {
+    const baseProduct = normalizedStock[index % normalizedStock.length]
+
+    return {
+      tarifAdi: item.name,
+      kisaAciklama: `${baseProduct.name} merkezli, hizli hazirlanan pratik bir ev yemegi.`,
+      tahminiSure: item.sure,
+      goruntuUrl: buildInlinePlaceholderImage(item.name),
+      matchedIngredients: [
+        {
+          isim: baseProduct.name,
+          miktar: String(Math.max(1, Number(baseProduct.quantity) || 1)),
+          birim: baseProduct.unit || 'adet',
+        },
+      ],
+      missingIngredients: [
+        { isim: 'zeytinyagi', miktar: '1', birim: 'yemek kasigi' },
+        { isim: 'tuz', miktar: '1', birim: 'cay kasigi' },
+      ],
+      pisirmeAdimlari: [
+        'Adim 1: Malzemeleri yikayip dograyin.',
+        'Adim 2: Tavayi isitip ana malzemeyi pisirmeye baslayin.',
+        'Adim 3: Baharatlari ekleyip lezzeti dengeleyin.',
+        'Adim 4: Yemegi sicak servis edin.',
+      ],
+    }
   })
 }
 
 const getLlmClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+  const apiKey = getGeminiApiKey()
   if (!apiKey) {
     const missingKeyError = new Error('Sunucuda GEMINI_API_KEY tanimli degil.')
     missingKeyError.statusCode = 500
@@ -282,169 +237,235 @@ const getLlmClient = () => {
 
   return new ChatGoogleGenerativeAI({
     apiKey,
-    model: MODEL_NAME,
+    model: TEXT_MODEL_NAME,
     temperature: 0.2,
   })
 }
 
-const getLlmClientOrNull = () => {
-  try {
-    return getLlmClient()
-  } catch {
-    return null
-  }
-}
-
-const translateIngredientNamesToEnglish = async ({ llm, pantryIngredientNames }) => {
-  const normalizedNames = pantryIngredientNames
-    .map((name) => String(name ?? '').trim())
-    .filter(Boolean)
-
-  if (normalizedNames.length === 0) {
-    return []
+const buildGenerateRecipePrompt = ({ budgetProfile, pantryStock, urgentProducts, agentInstruction }) => {
+  const payload = {
+    budgetProfile: String(budgetProfile ?? '').trim(),
+    pantryStock: sanitizeProductList(pantryStock),
+    urgentProducts: sanitizeProductList(urgentProducts),
+    agentInstruction: String(agentInstruction ?? '').trim(),
   }
 
-  const missingNames = normalizedNames.filter((name) => {
-    const key = normalizeText(name).replaceAll(' ', '_')
-    return !TR_TO_EN_INGREDIENT_MAP[key]
-  })
-
-  const fallbackTranslations = normalizedNames.map((name) => {
-    const key = normalizeText(name).replaceAll(' ', '_')
-    return {
-      source: name,
-      english: TR_TO_EN_INGREDIENT_MAP[key] || name,
-    }
-  })
-
-  if (missingNames.length === 0) {
-    return fallbackTranslations
-  }
-
-  if (!llm) {
-    return fallbackTranslations
-  }
-
-  const prompt = [
-    'Translate Turkish pantry ingredient names to concise culinary English.',
-    'Return STRICT JSON only in this format:',
-    '{"translations":[{"source":"...","english":"..."}]}',
-    'Rules:',
-    '- Preserve ingredient meaning in kitchen context.',
-    '- Use lowercase English names.',
-    `Ingredients: ${JSON.stringify(missingNames)}`,
+  return [
+    'SYSTEM:',
+    'Sen sadece Turk mutfagina ve Turkiye\'deki damak tadina hakim uzman bir sefsin.',
+    'Asla cikolata ile zeytinyagi gibi birbiriyle uyumsuz, mantiksiz malzemeleri ayni tarifte birlestirme (Halusinasyon YASAK).',
+    'Buzdolabindaki malzemeleri merkeze alarak 3 gercekci, pratik Turk yemegi veya evrensel ev yemegi oner.',
+    '',
+    'KRITIK CIKTI KURALLARI:',
+    '1) Yanit STRICT JSON olmalidir, markdown veya aciklama yazma.',
+    '2) JSON sadece su semaya uymali:',
+    '{"tarifler":[{"tarifAdi":"string","kisaAciklama":"string","tahminiSure":"string","goruntuUrl":"string","matchedIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"missingIngredients":[{"isim":"string","miktar":"string","birim":"string"}],"pisirmeAdimlari":["string"]}]}',
+    '3) Tam olarak 3 tarif dondur.',
+    '4) matchedIngredients yalnizca kullanicinin dolabinda olanlardan olusmali.',
+    `5) missingIngredients her tarifte zorunlu olmali, en az ${MIN_MISSING_INGREDIENTS} en fazla ${MAX_MISSING_INGREDIENTS} adet olmali ve dolapta olmamali.`,
+    '6) Tarifler gercek hayatta yapilabilir, dengeli ve mantikli olmali.',
+    '7) Pisirme adimlari 4-7 adim olmali.',
+    '8) goruntuUrl alanini bos string dondurebilirsin.',
+    '',
+    `GIRDI: ${JSON.stringify(payload)}`,
   ].join('\n')
-
-  const llmResponse = await llm.invoke(prompt)
-  const parsed = parseLooseJson(readLlmText(llmResponse))
-  const translatedItems = Array.isArray(parsed?.translations) ? parsed.translations : []
-
-  const translationMap = new Map()
-  translatedItems.forEach((item) => {
-    const source = String(item?.source ?? '').trim()
-    const english = String(item?.english ?? '').trim()
-    if (source && english) {
-      translationMap.set(source, english)
-    }
-  })
-
-  return fallbackTranslations.map((item) => ({
-    ...item,
-    english: translationMap.get(item.source) || item.english,
-  }))
 }
 
-const buildConstraintTranslatorOutput = async ({ llm, acceptedMeals }) => {
-  if (acceptedMeals.length === 0 || !llm) {
-    return []
-  }
-
-  const payload = acceptedMeals.map((meal) => ({
-    mealId: meal.idMeal,
-    mealName: meal.strMeal,
-    instructions: meal.strInstructions,
-    ingredients: meal.ingredients.map((ingredient) => ({
-      englishName: ingredient.englishName,
-      measure: ingredient.measure,
-    })),
-  }))
-
-  const prompt = [
-    'You are ConstraintTranslator_Tool for a Turkish recipe assistant.',
-    'Return STRICT JSON only in this format:',
-    '{"recipes":[{"mealId":"...","tarifAdi":"...","kisaAciklama":"...","tahminiSuresi":"...","pisirmeAdimlari":["Adim 1..."],"ingredientTranslations":[{"englishName":"...","isim":"...","miktar":"...","birim":"..."}]}]}',
-    'Rules:',
-    '1) Turkish must be natural and culinary-correct.',
-    '2) Convert ingredient measures naturally (example: 2 Tbsp Olive Oil -> 2 yemek kasigi zeytinyagi).',
-    '3) Keep 4-8 clear cooking steps per recipe.',
-    '4) Keep ingredientTranslations complete for each ingredient in input.',
-    `Input recipes: ${JSON.stringify(payload)}`,
-  ].join('\n')
-
-  const llmResponse = await llm.invoke(prompt)
-  const parsed = parseLooseJson(readLlmText(llmResponse))
-  return Array.isArray(parsed?.recipes) ? parsed.recipes : []
-}
-
-const fallbackTurkishName = (englishName) => {
-  const normalized = normalizeEnglishText(englishName)
-  const match = Object.entries(TR_TO_EN_INGREDIENT_MAP).find(([, value]) => value === normalized)
-  if (!match) {
-    return englishName
-  }
-  return match[0].replaceAll('_', ' ')
-}
-
-const toCompactIngredient = (ingredient, translatedIngredient) => {
-  return {
-    isim:
-      String(translatedIngredient?.isim ?? '').trim() || fallbackTurkishName(ingredient.englishName),
-    miktar:
-      String(translatedIngredient?.miktar ?? '').trim() || String(ingredient.miktar ?? '1').trim() || '1',
-    birim:
-      String(translatedIngredient?.birim ?? '').trim() || String(ingredient.birim ?? 'adet').trim() || 'adet',
-  }
-}
-
-const splitMatchedAndMissingIngredients = ({
-  ingredients,
-  pantryEnglishSet,
-  translatedIngredientMap,
+const GenerateRecipeTool = async ({
+  llm,
+  budgetProfile,
+  pantryStock,
+  urgentProducts,
+  agentInstruction,
 }) => {
-  const matchedIngredients = []
-  const missingIngredients = []
+  const llmResponse = await llm.invoke(
+    buildGenerateRecipePrompt({
+      budgetProfile,
+      pantryStock,
+      urgentProducts,
+      agentInstruction,
+    }),
+  )
 
-  ingredients.forEach((ingredient) => {
-    const translatedIngredient = translatedIngredientMap.get(normalizeEnglishText(ingredient.englishName))
-    const compactIngredient = toCompactIngredient(ingredient, translatedIngredient)
-
-    if (isIngredientInStock(ingredient.englishName, Array.from(pantryEnglishSet))) {
-      matchedIngredients.push(compactIngredient)
-    } else {
-      missingIngredients.push(compactIngredient)
-    }
-  })
-
-  return { matchedIngredients, missingIngredients }
+  return parseLooseJson(readLlmText(llmResponse))
 }
 
-const buildCookingStepsFallback = (instructionsText) => {
-  const chunks = String(instructionsText ?? '')
-    .split(/\r?\n|\./)
-    .map((step) => step.trim())
-    .filter(Boolean)
-    .slice(0, 8)
-
-  if (chunks.length === 0) {
-    return ['Adim 1: Malzemeleri hazirlayin.', 'Adim 2: Pisirme islemini tarife gore tamamlayin.']
+const translateRecipeNameToEnglish = async ({ llm, mealNameTr }) => {
+  const sourceName = String(mealNameTr ?? '').trim()
+  if (!sourceName) {
+    return 'Turkish homemade dish'
   }
 
-  return chunks.map((step, index) => `Adim ${index + 1}: ${step}`)
+  try {
+    const response = await llm.invoke(
+      [
+        'Translate this Turkish dish name to natural English culinary wording.',
+        'Return strict JSON only in this shape: {"englishName":"..."}',
+        `Dish name: ${sourceName}`,
+      ].join('\n'),
+    )
+
+    const parsed = parseLooseJson(readLlmText(response))
+    const translated = String(parsed?.englishName ?? '').trim()
+    return translated || sourceName
+  } catch {
+    return sourceName
+  }
 }
 
-const NanoBananaImageTool = async ({ mealNameTr, mealNameEn, fallbackImageUrl }) => {
+const normalizeImageValue = (value) => {
+  const imageValue = String(value ?? '').trim()
+  if (!imageValue) {
+    return ''
+  }
+
+  if (
+    imageValue.startsWith('http://') ||
+    imageValue.startsWith('https://') ||
+    imageValue.startsWith('data:image/')
+  ) {
+    return imageValue
+  }
+
+  return `data:image/png;base64,${imageValue}`
+}
+
+const extractNanoBananaImageFromPayload = (payload) => {
+  const directImage = [
+    payload?.imageUrl,
+    payload?.url,
+    payload?.image,
+    payload?.result?.imageUrl,
+    payload?.result?.url,
+    payload?.output?.imageUrl,
+    payload?.output?.url,
+    payload?.data?.imageUrl,
+    payload?.data?.url,
+    payload?.images?.[0]?.url,
+    payload?.images?.[0]?.imageUrl,
+    payload?.data?.[0]?.url,
+    payload?.data?.[0]?.imageUrl,
+  ]
+    .map(normalizeImageValue)
+    .find(Boolean)
+
+  if (directImage) {
+    return directImage
+  }
+
+  const base64Image = [
+    payload?.base64,
+    payload?.imageBase64,
+    payload?.b64,
+    payload?.b64_json,
+    payload?.data?.base64,
+    payload?.data?.b64_json,
+    payload?.data?.[0]?.b64_json,
+    payload?.data?.[0]?.base64,
+    payload?.images?.[0]?.b64_json,
+    payload?.generatedImages?.[0]?.image?.imageBytes,
+  ]
+    .map(normalizeImageValue)
+    .find(Boolean)
+
+  return base64Image || ''
+}
+
+const generateImageWithGemini = async ({ prompt }) => {
+  const apiKey = getGeminiApiKey()
+  if (!apiKey) {
+    return ''
+  }
+
+  const ai = new GoogleGenAI({ apiKey })
+  try {
+    const response = await ai.models.generateContent({
+      model: IMAGE_MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
+    })
+
+    const parts = Array.isArray(response?.candidates?.[0]?.content?.parts)
+      ? response.candidates[0].content.parts
+      : []
+
+    for (const part of parts) {
+      const imageBytes = String(part?.inlineData?.data ?? '').trim()
+      if (!imageBytes) {
+        continue
+      }
+
+      const mimeType = String(part?.inlineData?.mimeType ?? '').trim() || 'image/png'
+      return `data:${mimeType};base64,${imageBytes}`
+    }
+  } catch (error) {
+    console.warn('[image-generation] Gemini image model failed, falling back.', {
+      model: IMAGE_MODEL_NAME,
+      message: String(error?.message ?? error),
+    })
+  }
+
+  return ''
+}
+
+const buildKeylessPromptImageUrl = ({ prompt, mealNameTr }) => {
+  const encodedPrompt = encodeURIComponent(prompt)
+  const seed = encodeURIComponent(normalizeText(mealNameTr || 'kapya-dish'))
+  return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`
+}
+
+const buildStockFoodImageUrl = ({ mealNameTr }) => {
+  const seedBase = normalizeText(mealNameTr || 'kapya-dish')
+  let hash = 0
+  for (const char of seedBase) {
+    hash = (hash * 31 + Number(char.codePointAt(0) ?? 0)) % 2147483647
+  }
+  const lockValue = Math.max(hash, 1)
+  return `https://loremflickr.com/1024/1024/food,meal,dish?lock=${lockValue}`
+}
+
+const fetchImageAsDataUri = async (url) => {
+  const targetUrl = String(url ?? '').trim()
+  if (!targetUrl) {
+    return ''
+  }
+
+  try {
+    const response = await fetch(targetUrl, {
+      signal: AbortSignal.timeout(20000),
+    })
+
+    if (!response.ok) {
+      return ''
+    }
+
+    const contentType = String(response.headers.get('content-type') ?? '').trim() || 'image/jpeg'
+    if (!contentType.startsWith('image/')) {
+      return ''
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.length === 0) {
+      return ''
+    }
+
+    return `data:${contentType};base64,${buffer.toString('base64')}`
+  } catch {
+    return ''
+  }
+}
+
+const NanoBananaImageTool = async ({ llm, mealNameTr, fallbackImageUrl }) => {
   const apiUrl = String(process.env.NANO_BANANA_API_URL ?? '').trim()
   const apiKey = String(process.env.NANO_BANANA_API_KEY ?? '').trim()
+  const translatedMealName = await translateRecipeNameToEnglish({
+    llm,
+    mealNameTr,
+  })
+
+  const prompt = `Professional food photography of ${translatedMealName}, served on an elegant matte ceramic plate, top-down view, rustic wooden table background, cinematic studio lighting, hyper-realistic, 4k resolution, appetizing, Michelin star presentation style, highly detailed.`
 
   if (apiUrl && apiKey) {
     try {
@@ -453,223 +474,153 @@ const NanoBananaImageTool = async ({ mealNameTr, mealNameEn, fallbackImageUrl })
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          'x-api-key': apiKey,
         },
         body: JSON.stringify({
-          prompt: `Plate photo of cooked dish: ${mealNameTr || mealNameEn}`,
+          prompt,
           size: '1024x1024',
+          aspectRatio: '1:1',
+          n: 1,
         }),
       })
 
       if (response.ok) {
         const payload = await response.json().catch(() => null)
-        const imageUrl = String(payload?.imageUrl ?? '').trim()
-        const base64Image = String(payload?.base64 ?? '').trim()
-
-        if (imageUrl) {
-          return imageUrl
-        }
-
-        if (base64Image) {
-          return `data:image/png;base64,${base64Image}`
+        const imageFromPayload = extractNanoBananaImageFromPayload(payload)
+        if (imageFromPayload) {
+          return imageFromPayload
         }
       }
     } catch {
-      // Fallback path intentionally silent.
+      // Intentionally silent: fallback path handles image generation.
     }
   }
 
-  return String(fallbackImageUrl ?? '').trim() || NANO_BANANA_FALLBACK_IMAGE
-}
-
-const rankMealsByStockFit = ({ mealDetails, pantryEnglishSet }) => {
-  const pantryEnglishNames = Array.from(pantryEnglishSet)
-
-  return mealDetails
-    .map((meal) => {
-      const ingredientCount = meal.ingredients.length
-      const missingCount = meal.ingredients.filter(
-        (ingredient) => !isIngredientInStock(ingredient.englishName, pantryEnglishNames),
-      ).length
-
-      return {
-        ...meal,
-        ingredientCount,
-        missingCount,
-        matchedCount: Math.max(ingredientCount - missingCount, 0),
-      }
-    })
-    .sort((left, right) => {
-      if (left.missingCount !== right.missingCount) {
-        return left.missingCount - right.missingCount
-      }
-      return right.matchedCount - left.matchedCount
-    })
-}
-
-const buildPantryFallbackRecipes = ({ pantryStock }) => {
-  const stock = sanitizeProductList(pantryStock)
-  if (stock.length === 0) {
-    return []
+  const geminiImage = await generateImageWithGemini({ prompt })
+  if (geminiImage) {
+    return geminiImage
   }
 
-  return stock.slice(0, 3).map((product, index) => {
-    const dishName = `${product.name} Tavasi`
+  const keylessImageUrl = buildKeylessPromptImageUrl({ prompt, mealNameTr })
+  const keylessImageDataUri = await fetchImageAsDataUri(keylessImageUrl)
+  if (keylessImageDataUri) {
+    return keylessImageDataUri
+  }
 
-    return {
-      tarifAdi: dishName,
-      kisaAciklama: 'Stoktaki urunleri hizla degerlendirmek icin pratik bir alternatif.',
-      tahminiSuresi: '20-30 dakika',
-      goruntuUrl: NANO_BANANA_FALLBACK_IMAGE,
-      matchedIngredients: [
-        {
-          isim: product.name,
-          miktar: String(Math.max(1, Number(product.quantity) || 1)),
-          birim: product.unit || 'adet',
-        },
-      ],
-      missingIngredients: [
-        {
-          isim: 'zeytinyagi',
-          miktar: '1',
-          birim: 'yemek kasigi',
-        },
-      ],
-      pisirmeAdimlari: [
-        `Adim 1: ${product.name} malzemesini hazirlayin.`,
-        'Adim 2: Tavayi isitin ve az miktarda yag ekleyin.',
-        'Adim 3: Malzemeleri orta ateste kontrollu sekilde pisirin.',
-        `Adim 4: Sicakken servis edin.${index === 0 ? '' : ' Istege gore baharat ekleyin.'}`,
-      ],
-    }
+  const stockFoodImageUrl = buildStockFoodImageUrl({ mealNameTr })
+  const stockFoodImageDataUri = await fetchImageAsDataUri(stockFoodImageUrl)
+  if (stockFoodImageDataUri) {
+    return stockFoodImageDataUri
+  }
+
+  return String(fallbackImageUrl ?? '').trim() || buildInlinePlaceholderImage(mealNameTr)
+}
+
+const normalizeGeneratedRecipe = ({ recipe, pantryStock }) => {
+  const pantryNameSet = buildPantryNameSet(pantryStock)
+  const normalizedPantryStock = sanitizeProductList(pantryStock)
+
+  const matchedIngredientsRaw = sanitizeIngredientList(recipe?.matchedIngredients)
+  let matchedIngredients = matchedIngredientsRaw.filter((ingredient) =>
+    isIngredientInPantry(ingredient.isim, pantryNameSet),
+  )
+
+  if (matchedIngredients.length === 0) {
+    matchedIngredients = normalizedPantryStock.slice(0, 2).map((item) => ({
+      isim: item.name,
+      miktar: String(Math.max(1, Number(item.quantity) || 1)),
+      birim: item.unit || 'adet',
+    }))
+  }
+
+  const usedNameSet = new Set(matchedIngredients.map((item) => normalizeText(item.isim)))
+  const missingIngredientsRaw = sanitizeIngredientList(recipe?.missingIngredients)
+  const missingIngredients = ensureMissingIngredients({
+    missingIngredients: missingIngredientsRaw,
+    pantryNameSet,
+    usedNameSet,
   })
+
+  const pisirmeAdimlari = (Array.isArray(recipe?.pisirmeAdimlari) ? recipe.pisirmeAdimlari : [])
+    .map((step) => String(step ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 8)
+
+  const recipeName = String(recipe?.tarifAdi ?? '').trim() || 'Pratik Ev Yemegi'
+
+  return {
+    tarifAdi: recipeName,
+    kisaAciklama:
+      String(recipe?.kisaAciklama ?? '').trim() ||
+      'Dolaptaki urunleri odaga alan dengeli bir ev yemegi onerisi.',
+    tahminiSure:
+      String(recipe?.tahminiSure ?? recipe?.tahminiSuresi ?? '').trim() || '30-40 dakika',
+    goruntuUrl: String(recipe?.goruntuUrl ?? '').trim() || buildInlinePlaceholderImage(recipeName),
+    matchedIngredients,
+    missingIngredients,
+    pisirmeAdimlari:
+      pisirmeAdimlari.length > 0
+        ? pisirmeAdimlari
+        : [
+            'Adim 1: Malzemeleri hazirlayin.',
+            'Adim 2: Ana malzemeleri kontrollu sekilde pisirin.',
+            `Adim 3: ${recipeName} icin baharat dengesini kurun ve sicak servis edin.`,
+          ],
+  }
 }
 
-export const executeKapyaAgent = async ({ pantryStock, urgentProducts }) => {
-  const llm = getLlmClientOrNull()
+export const executeKapyaAgent = async ({
+  budgetProfile,
+  pantryStock,
+  urgentProducts,
+  agentInstruction,
+}) => {
+  const llm = getLlmClient()
 
   const normalizedPantryStock = sanitizeProductList(pantryStock)
   const normalizedUrgentProducts = sanitizeProductList(urgentProducts)
   const combinedStock = [...normalizedUrgentProducts, ...normalizedPantryStock]
 
-  const pantryIngredientNames = Array.from(new Set(combinedStock.map((item) => item.name.trim())))
-
-  if (pantryIngredientNames.length === 0) {
+  if (combinedStock.length === 0) {
     return { tarifler: [] }
   }
 
-  const translations = await translateIngredientNamesToEnglish({
+  const generated = await GenerateRecipeTool({
     llm,
-    pantryIngredientNames,
-  })
+    budgetProfile,
+    pantryStock: combinedStock,
+    urgentProducts: normalizedUrgentProducts,
+    agentInstruction,
+  }).catch(() => null)
 
-  const pantryEnglishSet = new Set(
-    translations.map((item) => normalizeEnglishText(item.english)).filter(Boolean),
+  const generatedRecipes = Array.isArray(generated?.tarifler) ? generated.tarifler : []
+  const normalizedRecipes = generatedRecipes
+    .map((recipe) => normalizeGeneratedRecipe({ recipe, pantryStock: combinedStock }))
+    .filter((recipe) => recipe.tarifAdi)
+
+  const fallbackRecipes = buildFallbackRecipes({ pantryStock: combinedStock })
+  const fallbackMap = new Map(
+    fallbackRecipes.map((recipe) => [normalizeText(recipe.tarifAdi), recipe]),
   )
 
-  const englishIngredientList = Array.from(pantryEnglishSet).slice(0, 8)
-  const mealIdGroups = await Promise.all(
-    englishIngredientList.map((ingredient) => fetchMealIdsByIngredient(ingredient)),
+  for (const recipe of normalizedRecipes) {
+    fallbackMap.delete(normalizeText(recipe.tarifAdi))
+  }
+
+  const tarifler = [...normalizedRecipes, ...Array.from(fallbackMap.values())].slice(0, 3)
+
+  const enrichedRecipes = await Promise.all(
+    tarifler.map(async (recipe) => ({
+      ...recipe,
+      goruntuUrl: await NanoBananaImageTool({
+        llm,
+        mealNameTr: recipe.tarifAdi,
+        fallbackImageUrl: recipe.goruntuUrl,
+      }),
+    })),
   )
 
-  const mealIds = Array.from(new Set(mealIdGroups.flat())).slice(0, 24)
-  if (mealIds.length === 0) {
-    return {
-      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
-    }
+  return {
+    tarifler: enrichedRecipes,
   }
-
-  const rawMealDetails = await Promise.all(mealIds.map((mealId) => fetchMealDetailById(mealId)))
-  const mealDetails = rawMealDetails
-    .filter(Boolean)
-    .filter((meal) => Array.isArray(meal.ingredients) && meal.ingredients.length > 0)
-
-  if (mealDetails.length === 0) {
-    return {
-      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
-    }
-  }
-
-  const rankedMeals = rankMealsByStockFit({
-    mealDetails,
-    pantryEnglishSet,
-  })
-
-  const strictMeals = rankedMeals.filter((meal) => meal.missingCount <= MAX_MISSING_INGREDIENTS)
-  const acceptedMeals =
-    strictMeals.length > 0
-      ? strictMeals.slice(0, 3)
-      : rankedMeals.slice(0, 3)
-
-  if (acceptedMeals.length === 0) {
-    return {
-      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
-    }
-  }
-
-  const translatedRecipes = await buildConstraintTranslatorOutput({
-    llm,
-    acceptedMeals,
-  })
-
-  const translatedRecipeMap = new Map()
-  translatedRecipes.forEach((recipe) => {
-    const mealId = String(recipe?.mealId ?? '').trim()
-    if (mealId) {
-      translatedRecipeMap.set(mealId, recipe)
-    }
-  })
-
-  const tarifler = await Promise.all(
-    acceptedMeals.map(async (meal) => {
-      const translatedRecipe = translatedRecipeMap.get(meal.idMeal)
-      const translatedIngredientMap = new Map(
-        (Array.isArray(translatedRecipe?.ingredientTranslations)
-          ? translatedRecipe.ingredientTranslations
-          : []
-        )
-          .map((item) => ({
-            key: normalizeEnglishText(item?.englishName),
-            value: item,
-          }))
-          .filter((item) => item.key)
-          .map((item) => [item.key, item.value]),
-      )
-
-      const { matchedIngredients, missingIngredients } = splitMatchedAndMissingIngredients({
-        ingredients: meal.ingredients,
-        pantryEnglishSet,
-        translatedIngredientMap,
-      })
-
-      const translatedName = String(translatedRecipe?.tarifAdi ?? '').trim()
-      const imageUrl = await NanoBananaImageTool({
-        mealNameTr: translatedName,
-        mealNameEn: meal.strMeal,
-        fallbackImageUrl: meal.strMealThumb,
-      })
-
-      return {
-        tarifAdi: translatedName || meal.strMeal,
-        kisaAciklama:
-          String(translatedRecipe?.kisaAciklama ?? '').trim() ||
-          'Mevcut stokla hizli sekilde hazirlanabilen dengeli bir tarif.',
-        tahminiSuresi: String(translatedRecipe?.tahminiSuresi ?? '').trim() || '30-45 dakika',
-        goruntuUrl: imageUrl,
-        matchedIngredients,
-        missingIngredients,
-        pisirmeAdimlari:
-          Array.isArray(translatedRecipe?.pisirmeAdimlari) && translatedRecipe.pisirmeAdimlari.length
-            ? translatedRecipe.pisirmeAdimlari.map((step) => String(step ?? '').trim()).filter(Boolean)
-            : buildCookingStepsFallback(meal.strInstructions),
-      }
-    }),
-  )
-
-  if (tarifler.length === 0) {
-    return {
-      tarifler: buildPantryFallbackRecipes({ pantryStock: combinedStock }),
-    }
-  }
-
-  return { tarifler }
 }

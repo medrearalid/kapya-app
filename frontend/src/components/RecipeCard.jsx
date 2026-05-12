@@ -13,6 +13,10 @@ const normalizeCompactIngredient = (ingredient) => ({
   birim: String(ingredient?.birim ?? ingredient?.unit ?? 'adet').trim() || 'adet',
 })
 
+const RECIPE_IMAGE_PLACEHOLDER = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fef3c7"/><stop offset="100%" stop-color="#fcd34d"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><text x="512" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" fill="#78350f">KAPYA</text></svg>',
+)}`
+
 const getTodayDate = () => new Date().toISOString().slice(0, 10)
 
 function RecipeCard({ recipe }) {
@@ -53,7 +57,7 @@ function RecipeCard({ recipe }) {
     () => ({
       tarifAdi: String(recipe?.tarifAdi ?? '').trim(),
       kisaAciklama: String(recipe?.kisaAciklama ?? '').trim(),
-      tahminiSuresi: String(recipe?.tahminiSuresi ?? '').trim(),
+      tahminiSure: String(recipe?.tahminiSure ?? recipe?.tahminiSuresi ?? '').trim(),
       goruntuUrl: String(recipe?.goruntuUrl ?? '').trim(),
       matchedIngredients,
       missingIngredients,
@@ -83,11 +87,15 @@ function RecipeCard({ recipe }) {
 
   return (
     <article className="glass-panel soft-card rounded-2xl border border-sage-200/65 bg-white/75 p-4 dark:border-sage-900/40 dark:bg-slate-900/60">
-      <div className="overflow-hidden rounded-2xl border border-white/60 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mx-auto aspect-square w-full max-w-[420px] overflow-hidden rounded-2xl border border-white/60 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
         <img
-          src={recipe?.goruntuUrl || ''}
+          src={recipe?.goruntuUrl || RECIPE_IMAGE_PLACEHOLDER}
           alt={recipe?.tarifAdi || 'Tarif gorseli'}
-          className="h-44 w-full object-cover"
+          className="h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.onerror = null
+            event.currentTarget.src = RECIPE_IMAGE_PLACEHOLDER
+          }}
           loading="lazy"
         />
       </div>
@@ -97,7 +105,7 @@ function RecipeCard({ recipe }) {
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{recipe?.kisaAciklama}</p>
         <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
           <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('recipes.timeLabel', { time: recipe?.tahminiSuresi || '-' })}
+          {t('recipes.timeLabel', { time: recipe?.tahminiSure || recipe?.tahminiSuresi || '-' })}
         </p>
       </div>
 
@@ -192,6 +200,7 @@ RecipeCard.propTypes = {
   recipe: PropTypes.shape({
     tarifAdi: PropTypes.string,
     kisaAciklama: PropTypes.string,
+    tahminiSure: PropTypes.string,
     tahminiSuresi: PropTypes.string,
     goruntuUrl: PropTypes.string,
     matchedIngredients: PropTypes.arrayOf(
