@@ -21,8 +21,21 @@ app.use('/api/receipts', receiptRouter)
 
 app.use((error, _request, response, _next) => {
 	const statusCode = Number(error?.statusCode) || 500
+
+	if (statusCode >= 500) {
+		console.error('[backend-error]', {
+			message: error?.message,
+			stack: error?.stack,
+		})
+	}
+
+	const isReceiptRoute = _request.path?.startsWith('/api/receipts')
 	const errorMessage =
-		statusCode >= 500 ? 'AI tarifi uretilirken sunucu hatasi olustu.' : error.message
+		statusCode >= 500
+			? isReceiptRoute
+				? 'Fis analizi yapilirken sunucu hatasi olustu.'
+				: 'AI tarifi uretilirken sunucu hatasi olustu.'
+			: error.message
 
 	response.status(statusCode).json({
 		success: false,

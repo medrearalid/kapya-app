@@ -7,6 +7,7 @@ import RootLayout from './components/root-layout'
 import DashboardPage from './pages/dashboard-page'
 import PantryPage from './pages/pantry-page'
 import RecipePage from './pages/recipe-page'
+import SettingsPage from './pages/settings-page'
 
 const router = createBrowserRouter([
   {
@@ -24,6 +25,10 @@ const router = createBrowserRouter([
       {
         path: 'recipes',
         element: <RecipePage />,
+      },
+      {
+        path: 'settings',
+        element: <SettingsPage />,
       },
     ],
   },

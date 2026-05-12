@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { postWasteSaverRecipes } from '../controllers/recipe-agent-controller.js'
+import { postWasteSaverRecipes } from '../controllers/recipeController.js'
 
 const recipeAgentRouter = Router()
 

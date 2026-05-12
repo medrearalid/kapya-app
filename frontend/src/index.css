@@ -1,9 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Sora:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+  --kapya-primary: #e63946;
+  --kapya-secondary: #2a9d8f;
+  --kapya-bg: #f8f9fa;
+  --kapya-surface: rgba(255, 255, 255, 0.66);
+  --kapya-border: rgba(255, 255, 255, 0.42);
+  --kapya-text: #2b2822;
+  font-family: 'Sora', 'Segoe UI', sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -18,11 +26,10 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: #2f2a1e;
+  color: var(--kapya-text);
   background:
-    radial-gradient(circle at 10% -10%, #f2f0e6 0%, transparent 45%),
-    radial-gradient(circle at 100% 0%, #e7e2d0 0%, transparent 35%),
-    #f8f7f1;
+    linear-gradient(145deg, rgba(230, 57, 70, 0.12) 0%, rgba(42, 157, 143, 0.1) 45%, rgba(255, 255, 255, 0) 100%),
+    var(--kapya-bg);
   transition:
     background 220ms ease,
     color 220ms ease;
@@ -33,9 +40,38 @@ body {
 }
 
 .dark body {
-  color: #e2e8f0;
+  --kapya-surface: rgba(36, 36, 42, 0.62);
+  --kapya-border: rgba(147, 161, 185, 0.2);
+  --kapya-text: #f2f4f8;
+  color: var(--kapya-text);
   background:
-    radial-gradient(circle at 10% -15%, rgba(51, 65, 85, 0.4) 0%, transparent 48%),
-    radial-gradient(circle at 100% 0%, rgba(30, 41, 59, 0.42) 0%, transparent 40%),
-    #0b1220;
+    linear-gradient(150deg, rgba(230, 57, 70, 0.22) 0%, rgba(42, 157, 143, 0.2) 40%, rgba(22, 28, 42, 0.42) 100%),
+    #1e1e24;
+}
+
+@layer components {
+  .glass-panel {
+    background: var(--kapya-surface);
+    border: 1px solid var(--kapya-border);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .soft-card {
+    @apply rounded-2xl shadow-soft;
+  }
+
+  .heading-display {
+    font-family: 'Fraunces', serif;
+    letter-spacing: -0.015em;
+  }
+
+  .tap-feedback {
+    @apply transition-transform duration-150;
+  }
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }

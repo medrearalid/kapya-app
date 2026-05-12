@@ -2,7 +2,7 @@ import { GoogleGenAI } from '@google/genai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-const RECEIPT_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash'
+const RECEIPT_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash-lite'
 
 const recipeResponseJsonSchema = {
   type: 'object',
@@ -157,7 +157,9 @@ export const generateWasteSaverRecipes = async ({
 const parseReceiptJsonResponse = (rawText) => {
   const parsed = parseJsonResponse(rawText)
   if (!Array.isArray(parsed)) {
-    throw new TypeError('Fis analizi sonucu gecerli bir JSON dizisi degil.')
+    const responseFormatError = new TypeError('Fis analizi sonucu gecerli bir JSON dizisi degil.')
+    responseFormatError.statusCode = 502
+    throw responseFormatError
   }
 
   const normalizedItems = parsed
@@ -180,7 +182,9 @@ const parseReceiptJsonResponse = (rawText) => {
     )
 
   if (normalizedItems.length === 0) {
-    throw new Error('Fis uzerinden gecerli gida urunu cikartilamadi.')
+    const noItemsError = new Error('Fisten gecerli gida urunu cikartilamadi. Daha net bir fis gorseli deneyin.')
+    noItemsError.statusCode = 422
+    throw noItemsError
   }
 
   return normalizedItems
@@ -189,7 +193,9 @@ const parseReceiptJsonResponse = (rawText) => {
 const parseDataUrl = (imageBase64) => {
   const rawInput = String(imageBase64 ?? '').trim()
   if (!rawInput) {
-    throw new Error('Gecerli bir fis gorseli gonderilmedi.')
+    const invalidInputError = new Error('Gecerli bir fis gorseli gonderilmedi.')
+    invalidInputError.statusCode = 400
+    throw invalidInputError
   }
 
   const dataUrlRegex = /^data:(.+);base64,(.+)$/
@@ -236,15 +242,22 @@ export const analyzeReceiptImage = async ({ imageBase64 }) => {
     },
   })
 
-  const result = await model.generateContent([
-    prompt,
-    {
-      inlineData: {
-        mimeType,
-        data: base64Data,
+  let result
+  try {
+    result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          mimeType,
+          data: base64Data,
+        },
       },
-    },
-  ])
+    ])
+  } catch {
+    const providerError = new Error('Fis analizi icin AI servisinden yanit alinamadi.')
+    providerError.statusCode = 502
+    throw providerError
+  }
 
   const rawText = result?.response?.text?.() || ''
   return parseReceiptJsonResponse(rawText)

@@ -1,8 +1,9 @@
 {
   "navigation": {
-    "home": "Ana Ekran",
+    "home": "Ana Sayfa",
     "pantry": "Buzdolabı",
-    "recipes": "Tarifler",
+    "recipes": "Tarif",
+    "settings": "Ayarlar",
     "switchToDark": "Karanlık moda geç",
     "switchToLight": "Aydınlık moda geç"
   },
@@ -11,43 +12,56 @@
     "family": "Aile",
     "luxury": "Lüks"
   },
+  "onboarding": {
+    "title": "Profilinizi Seçin",
+    "subtitle": "Kapya, seçtiğiniz profile göre israfı azaltır ve önerileri kişiselleştirir.",
+    "profileHint": {
+      "öğrenci": "Hızlı, hesaplı ve pratik yemek akışı",
+      "aile": "Planlı alışveriş ve dengeli porsiyon önerileri",
+      "lüks": "Premium malzemelerle daha rafine tarif önerileri"
+    }
+  },
   "dashboard": {
-    "badge": "Ana Ekran",
-    "title": "Ana Ekran",
-    "alarmTitle": "Tüketilmesi Gerekenler (Kırmızı Alarm)",
-    "noUrgentProducts": "Bugün kritik seviyede ürün bulunmuyor.",
-    "urgentProductItem": "{{name}} - {{quantity}} {{unit}} - SKT {{date}}",
-    "generateButton": "Beni İsraftan Kurtar / Tarif Üret",
+    "badge": "Günlük Özet",
+    "title": "Ana Sayfa",
+    "greeting": "Merhaba, bugün dolapta {{count}} ürün var",
+    "alarmTitle": "Kırmızı Alarm",
+    "alarmSubtitle": "Tüketilmesi gereken ürünler",
+    "noUrgentProducts": "Her şey taze",
+    "urgentProductItem": "{{name}} · {{quantity}} {{unit}} · {{days}} gün kaldı",
+    "scanReceiptButton": "Fiş Okut",
+    "generateButton": "Bugün Ne Yesem?",
+    "generateButtonAssist": "Beni İsraftan Kurtar / Tarif Üret",
     "loadingButton": "Tarifler üretiliyor...",
-    "selectedBudgetProfile": "Seçili Bütçe Profili",
-    "totalProducts": "Toplam Ürün",
-    "expiringTitle": "Yaklaşan Raf Ömrü Uyarıları",
-    "expiringCount": "{{count}} ürün için tüketim planı oluşturulabilir.",
-    "expiringNone": "Şimdilik kritik ürün yok.",
-    "proactiveRecipes": "Proaktif Tarif Önerileri",
-    "portionCost": "Porsiyon maliyeti: {{cost}}",
-    "defaultRequestError": "Tarifler üretilirken bir hata oluştu."
+    "defaultRequestError": "Tarifler üretilirken bir sorun oluştu."
   },
   "pantry": {
-    "badge": "Kiler",
-    "title": "Stok Giriş / Çıkış",
-    "budgetProfile": "Bütçe Profili",
-    "addProductTitle": "Yeni Ürün Ekle",
+    "badge": "Buzdolabı",
+    "title": "Buzdolabı Yönetimi",
+    "addProductTitle": "Hızlı Ürün Ekle",
     "namePlaceholder": "Ürün adı",
     "quantityPlaceholder": "Miktar",
-    "unitPlaceholder": "Birim",
-    "addButton": "Ürün Ekle",
-    "listTitle": "Mutfak Ürünleri",
-    "productLine": "{{quantity}} {{unit}} - {{date}}",
+    "unitLabel": "Birim",
+    "addButton": "Ekle",
+    "listTitle": "Dolaptaki Ürünler",
+    "productLine": "{{quantity}} {{unit}} {{name}}",
+    "units": {
+      "adet": "adet",
+      "gram": "gram",
+      "kilogram": "kilogram",
+      "paket": "paket",
+      "bag": "bağ",
+      "litre": "litre",
+      "mililitre": "mililitre"
+    },
+    "emptyState": "Buzdolabı şu an boş.",
     "deleteProductAria": "{{name}} ürününü sil",
     "receipt": {
-      "title": "Fişten Otomatik Stok Ekleme",
-      "description": "Kamera veya galeriden fiş fotoğrafı yükleyin, ürünler kilerinize otomatik eklensin.",
-      "uploadButton": "Kamera / Fiş Fotoğrafı Yükle",
+      "fabButton": "Fişten Ekle",
       "loadingMessage": "Fişiniz yapay zeka tarafından analiz ediliyor...",
-      "loadingHint": "Fişiniz yapay zeka tarafından analiz ediliyor...",
+      "networkError": "Sunucuya ulaşılamadı. Backend servisinin çalıştığını ve API adresini kontrol edin.",
       "defaultError": "Fiş analizi sırasında bir sorun oluştu.",
-      "successToast": "Süper! Fişteki ürünler kilerinize eklendi."
+      "successToast": "Süper! Fişteki ürünler buzdolabınıza eklendi."
     }
   },
   "recipes": {
@@ -60,6 +74,9 @@
     "skeletonTitle": "Tarif İskeleti",
     "skeletonDescription": "Bu alan, AI servisinden gelen tarif önerilerinin listeleneceği ekran iskeletidir.",
     "generatedCount": "{{count}} tarif hazır. Porsiyonu ayarlayıp pişirmeye başlayabilirsin.",
+    "savingsBadge": "Tasarruf Edildi",
+    "savingsAmount": "{{amount}} TL",
+    "savingsMessageFallback": "Kritik ürünleri kullanarak yaklaşık {{amount}} TL tasarruf ettin.",
     "emptyTitle": "Tarif listesi boş",
     "emptyDescription": "Ana ekrandan 'Beni İsraftan Kurtar / Tarif Üret' butonuna basarak yeni tarifler oluştur.",
     "portionSize": "{{count}} kişilik",
@@ -71,5 +88,15 @@
     "cookButton": "Bu Tarifi Pişir",
     "wasteHint": "Stoktan otomatik düşülür, israf önlenir.",
     "toastSaved": "Harika! Malzemeleri değerlendirerek tasarruf ettin."
+  },
+  "settings": {
+    "badge": "Ayarlar",
+    "title": "Uygulama Ayarları",
+    "budgetProfile": "Bütçe Profili",
+    "theme": "Tema",
+    "themeLight": "Aydınlık",
+    "themeDark": "Karanlık",
+    "language": "Dil Seçimi",
+    "resetData": "Tüm Verileri Sıfırla"
   }
 }

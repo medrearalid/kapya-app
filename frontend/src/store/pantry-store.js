@@ -1,6 +1,9 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 const THEME_STORAGE_KEY = 'kapya-theme'
+const PROFILE_STORAGE_KEY = 'kapya-budget-profile'
+const ONBOARDING_STORAGE_KEY = 'kapya-onboarding-completed'
 const themeOptions = new Set(['light', 'dark'])
 
 const budgetProfileOptions = [
@@ -16,6 +19,16 @@ const budgetProfileOptions = [
     id: 'lüks',
     labelKey: 'budgetProfiles.luxury',
   },
+]
+
+export const productUnitOptions = [
+  'adet',
+  'gram',
+  'kilogram',
+  'paket',
+  'bag',
+  'litre',
+  'mililitre',
 ]
 
 const daysFromNow = (days) => {
@@ -51,6 +64,25 @@ const getSavedTheme = () => {
   return themeOptions.has(savedTheme) ? savedTheme : null
 }
 
+const getSavedBudgetProfile = () => {
+  if (globalThis.window === undefined) {
+    return budgetProfileOptions[0].id
+  }
+
+  const savedProfile = globalThis.window.localStorage.getItem(PROFILE_STORAGE_KEY)
+  return budgetProfileOptions.some((profile) => profile.id === savedProfile)
+    ? savedProfile
+    : budgetProfileOptions[0].id
+}
+
+const getSavedOnboardingState = () => {
+  if (globalThis.window === undefined) {
+    return false
+  }
+
+  return globalThis.window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true'
+}
+
 const getInitialTheme = () => getSavedTheme() || getSystemTheme()
 
 const persistTheme = (theme) => {
@@ -61,7 +93,92 @@ const persistTheme = (theme) => {
   globalThis.window.localStorage.setItem(THEME_STORAGE_KEY, theme)
 }
 
+const persistBudgetProfile = (profile) => {
+  if (globalThis.window === undefined) {
+    return
+  }
+
+  globalThis.window.localStorage.setItem(PROFILE_STORAGE_KEY, profile)
+}
+
+const persistOnboardingState = (value) => {
+  if (globalThis.window === undefined) {
+    return
+  }
+
+  globalThis.window.localStorage.setItem(ONBOARDING_STORAGE_KEY, value ? 'true' : 'false')
+}
+
 const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
+
+const normalizeUnit = (value) => {
+  const unit = normalize(value)
+  if (!unit) {
+    return 'adet'
+  }
+
+  return unit === 'bağ' ? 'bag' : unit
+}
+
+const resolveShelfLifeDate = (firstDate, secondDate) => {
+  const first = String(firstDate ?? '').trim()
+  const second = String(secondDate ?? '').trim()
+
+  if (!first) {
+    return second || daysFromNow(7)
+  }
+
+  if (!second) {
+    return first
+  }
+
+  return first < second ? first : second
+}
+
+const getMergeIndex = (products, targetProduct) =>
+  products.findIndex(
+    (product) =>
+      normalize(product?.name) === normalize(targetProduct?.name) &&
+      normalizeUnit(product?.unit) === normalizeUnit(targetProduct?.unit),
+  )
+
+const mergeIncomingProduct = (products, incomingProduct) => {
+  const now = Date.now()
+  const existingIndex = getMergeIndex(products, incomingProduct)
+
+  if (existingIndex < 0) {
+    return [
+      {
+        ...incomingProduct,
+        id: createProductId(),
+        addedAt: now,
+        updatedAt: now,
+      },
+      ...products,
+    ]
+  }
+
+  const nextProducts = [...products]
+  const existingProduct = nextProducts[existingIndex]
+  const mergedQuantity = Number(
+    (
+      toPositiveNumber(existingProduct.quantity, 0) +
+      toPositiveNumber(incomingProduct.quantity, 0)
+    ).toFixed(2),
+  )
+
+  nextProducts[existingIndex] = {
+    ...existingProduct,
+    quantity: mergedQuantity,
+    estimatedShelfLifeEndDate: resolveShelfLifeDate(
+      existingProduct.estimatedShelfLifeEndDate,
+      incomingProduct.estimatedShelfLifeEndDate,
+    ),
+    updatedAt: now,
+  }
+
+  return nextProducts
+}
 
 const normalizeIngredient = (ingredient) => ({
   name: String(ingredient?.name ?? ingredient?.isim ?? '').trim(),
@@ -77,13 +194,15 @@ const createProductId = () => {
   return `product-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-const defaultProducts = [
+const createDefaultProducts = () => [
   {
     id: createProductId(),
     name: 'Makarna',
     quantity: 2,
     unit: 'paket',
     estimatedShelfLifeEndDate: daysFromNow(180),
+    addedAt: Date.now(),
+    updatedAt: Date.now(),
   },
   {
     id: createProductId(),
@@ -91,6 +210,8 @@ const defaultProducts = [
     quantity: 10,
     unit: 'adet',
     estimatedShelfLifeEndDate: daysFromNow(9),
+    addedAt: Date.now(),
+    updatedAt: Date.now(),
   },
 ]
 
@@ -100,11 +221,15 @@ export const getBudgetProfileLabelKey = (profileId) =>
   budgetProfileOptions.find((profile) => profile.id === profileId)?.labelKey ||
   'budgetProfiles.student'
 
-export const usePantryStore = create((set) => ({
-  selectedBudgetProfile: 'öğrenci',
+export const usePantryStore = create(
+  persist(
+    (set) => ({
+  selectedBudgetProfile: getSavedBudgetProfile(),
+  hasCompletedOnboarding: getSavedOnboardingState(),
   currentTheme: getInitialTheme(),
-  products: defaultProducts,
+  products: createDefaultProducts(),
   generatedRecipes: [],
+  agentInsight: null,
   toastMessage: null,
 
   initializeThemeFromSystem: () => {
@@ -136,7 +261,38 @@ export const usePantryStore = create((set) => ({
       return
     }
 
+    persistBudgetProfile(profile)
     set({ selectedBudgetProfile: profile })
+  },
+
+  completeOnboarding: (profile) => {
+    if (!budgetProfileOptions.some((option) => option.id === profile)) {
+      return
+    }
+
+    persistBudgetProfile(profile)
+    persistOnboardingState(true)
+    set({
+      selectedBudgetProfile: profile,
+      hasCompletedOnboarding: true,
+    })
+  },
+
+  resetAllData: () => {
+    persistBudgetProfile(budgetProfileOptions[0].id)
+    persistOnboardingState(false)
+
+    set((state) => ({
+      selectedBudgetProfile: budgetProfileOptions[0].id,
+      hasCompletedOnboarding: false,
+      products: createDefaultProducts(),
+      generatedRecipes: [],
+      agentInsight: null,
+      toastMessage: {
+        id: Date.now(),
+        message: 'Veriler temizlendi.',
+      },
+    }))
   },
 
   addProduct: (productInput) =>
@@ -148,12 +304,11 @@ export const usePantryStore = create((set) => ({
 
       const parsedQuantity = Number(productInput?.quantity)
       const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1
-      const unit = String(productInput?.unit ?? 'adet').trim() || 'adet'
+      const unit = normalizeUnit(productInput?.unit ?? 'adet')
       const estimatedShelfLifeEndDate =
         String(productInput?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(7)
 
-      const newProduct = {
-        id: createProductId(),
+      const incomingProduct = {
         name,
         quantity,
         unit,
@@ -161,7 +316,7 @@ export const usePantryStore = create((set) => ({
       }
 
       return {
-        products: [newProduct, ...state.products],
+        products: mergeIncomingProduct(state.products, incomingProduct),
       }
     }),
 
@@ -175,11 +330,10 @@ export const usePantryStore = create((set) => ({
           }
 
           const quantity = toPositiveNumber(item?.quantity, 1)
-          const unit = String(item?.unit ?? 'adet').trim() || 'adet'
+          const unit = normalizeUnit(item?.unit ?? 'adet')
           const shelfLifeDays = toPositiveNumber(item?.estimatedShelfLifeDays, 7)
 
           return {
-            id: createProductId(),
             name,
             quantity,
             unit,
@@ -192,8 +346,14 @@ export const usePantryStore = create((set) => ({
         return state
       }
 
+      const mergedProducts = normalizedProducts.reduce(
+        (currentProducts, incomingProduct) =>
+          mergeIncomingProduct(currentProducts, incomingProduct),
+        state.products,
+      )
+
       return {
-        products: [...normalizedProducts, ...state.products],
+        products: mergedProducts,
       }
     }),
 
@@ -202,9 +362,21 @@ export const usePantryStore = create((set) => ({
       generatedRecipes: Array.isArray(recipes) ? recipes : [],
     }),
 
+  setAgentInsight: (insight) =>
+    set({
+      agentInsight:
+        insight && typeof insight === 'object'
+          ? {
+              tasarrufEdilenTutar: Math.max(0, Math.round(Number(insight?.tasarrufEdilenTutar) || 0)),
+              ajanMesaji: String(insight?.ajanMesaji ?? '').trim(),
+            }
+          : null,
+    }),
+
   clearGeneratedRecipes: () =>
     set({
       generatedRecipes: [],
+      agentInsight: null,
     }),
 
   consumeRecipeIngredients: ({ ingredients, portionSize = 1 }) =>
@@ -241,6 +413,7 @@ export const usePantryStore = create((set) => ({
           {
             ...product,
             quantity: remainingQuantity,
+            updatedAt: Date.now(),
           },
         ]
       })
@@ -276,4 +449,14 @@ export const usePantryStore = create((set) => ({
         ),
       }
     }),
-}))
+}),
+    {
+      name: 'kapya-pantry-store',
+      partialize: (state) => ({
+        selectedBudgetProfile: state.selectedBudgetProfile,
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
+        products: state.products,
+      }),
+    },
+  ),
+)

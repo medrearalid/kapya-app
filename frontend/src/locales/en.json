@@ -1,0 +1,102 @@
+{
+  "navigation": {
+    "home": "Home",
+    "pantry": "Fridge",
+    "recipes": "Recipes",
+    "settings": "Settings",
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode"
+  },
+  "budgetProfiles": {
+    "student": "Student",
+    "family": "Family",
+    "luxury": "Luxury"
+  },
+  "onboarding": {
+    "title": "Pick Your Profile",
+    "subtitle": "Kapya personalizes suggestions and cuts food waste based on your profile.",
+    "profileHint": {
+      "öğrenci": "Fast, practical and budget-friendly flows",
+      "aile": "Planned shopping and balanced portions",
+      "lüks": "More refined recipe suggestions"
+    }
+  },
+  "dashboard": {
+    "badge": "Daily Overview",
+    "title": "Home",
+    "greeting": "Hi, there are {{count}} items in your fridge today",
+    "alarmTitle": "Red Alert",
+    "alarmSubtitle": "Consume these first",
+    "noUrgentProducts": "Everything is fresh",
+    "urgentProductItem": "{{name}} · {{quantity}} {{unit}} · {{days}} days left",
+    "scanReceiptButton": "Scan Receipt",
+    "generateButton": "What Should I Eat Today?",
+    "generateButtonAssist": "Save Me From Waste / Generate Recipe",
+    "loadingButton": "Generating recipes...",
+    "defaultRequestError": "Something went wrong while generating recipes."
+  },
+  "pantry": {
+    "badge": "Fridge",
+    "title": "Fridge Manager",
+    "addProductTitle": "Quick Add",
+    "namePlaceholder": "Product name",
+    "quantityPlaceholder": "Quantity",
+    "unitLabel": "Unit",
+    "addButton": "Add",
+    "listTitle": "Items in Fridge",
+    "productLine": "{{quantity}} {{unit}} {{name}}",
+    "units": {
+      "adet": "pcs",
+      "gram": "gram",
+      "kilogram": "kilogram",
+      "paket": "pack",
+      "bag": "bunch",
+      "litre": "liter",
+      "mililitre": "milliliter"
+    },
+    "emptyState": "Your fridge is empty right now.",
+    "deleteProductAria": "Delete {{name}}",
+    "receipt": {
+      "fabButton": "Add from Receipt",
+      "loadingMessage": "Analyzing your receipt with AI...",
+      "networkError": "Unable to reach the server. Check that backend is running and API URL is correct.",
+      "defaultError": "A problem occurred while analyzing the receipt.",
+      "successToast": "Great! Receipt items were added to your fridge."
+    }
+  },
+  "recipes": {
+    "badge": "Recipes",
+    "title": "AI Suggestions",
+    "parametersTitle": "Suggestion Inputs",
+    "budgetMode": "Budget mode: {{profile}}",
+    "availableProducts": "Available products: {{products}}",
+    "noProducts": "No products yet",
+    "skeletonTitle": "Recipe Deck",
+    "skeletonDescription": "This area lists recipe suggestions coming from the AI service.",
+    "generatedCount": "{{count}} recipes are ready. Tune portions and start cooking.",
+    "savingsBadge": "Savings Achieved",
+    "savingsAmount": "{{amount}} TL",
+    "savingsMessageFallback": "You unlocked about {{amount}} TL savings by using critical ingredients in time.",
+    "emptyTitle": "Recipe list is empty",
+    "emptyDescription": "Tap 'Save Me From Waste / Generate Recipe' on Home to create suggestions.",
+    "portionSize": "{{count}} servings",
+    "decreasePortion": "Decrease portion",
+    "increasePortion": "Increase portion",
+    "ingredientsTitle": "Ingredients",
+    "ingredientCalculated": "Required: {{amount}} {{unit}}",
+    "ingredientBase": "Base for 1 serving: {{amount}} {{unit}}",
+    "cookButton": "Cook This Recipe",
+    "wasteHint": "Automatically deducted from stock, less waste.",
+    "toastSaved": "Nice! You saved by using what you already had."
+  },
+  "settings": {
+    "badge": "Settings",
+    "title": "App Settings",
+    "budgetProfile": "Budget Profile",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "language": "Language",
+    "resetData": "Reset All Data"
+  }
+}

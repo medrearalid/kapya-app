@@ -1,11 +1,13 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
+const buildApiUrl = (path) => `${API_BASE_URL}${path}`
 
 export const generateWasteSaverRecipes = async ({
   budgetProfile,
   pantryStock,
   urgentProducts,
 }) => {
-  const response = await fetch(`${API_BASE_URL}/api/ai/recipes/waste-saver`, {
+  const response = await fetch(buildApiUrl('/api/ai/recipes/waste-saver'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
