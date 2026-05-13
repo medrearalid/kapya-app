@@ -1,5 +1,10 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { GoogleGenAI } from '@google/genai'
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
+
+// Per-request emit context — thread-safe via AsyncLocalStorage
+const emitterStorage = new AsyncLocalStorage()
+const emitLog = (message) => emitterStorage.getStore()?.(message)
 
 const MODEL_NAME = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-pro'
 const MAX_RETRIES = 1
@@ -115,8 +120,10 @@ async function callGemini({ prompt, schema }) {
 // Reads the KB trigger and dispatches to the correct worker. No LLM call here.
 
 function supervisorNode(state) {
+  emitLog('🧠 Supervisor: Bilgi tabanı (Knowledge Base) senkronize ediliyor...')
   const trigger = String(state.knowledgeBase?.trigger ?? '').toLowerCase()
   const workerType = (trigger === 'wallet_page' || trigger === 'finance') ? 'finance' : 'dietitian'
+  emitLog('🔍 Supervisor: Mutfak stokları ve geçmiş tüketim analiz ediliyor...')
   return { workerType }
 }
 
@@ -127,6 +134,8 @@ function supervisorRouter(state) {
 // ── 6. Worker Nodes ──────────────────────────────────────────────────────────
 
 async function dietitianWorkerNode(state) {
+  emitLog('👨‍🍳 Şef Ajan: Elimizdeki malzemelerle geleneksel tarif kombinasyonları taranıyor...')
+  emitLog('🩺 Diyetisyen Ajan: Tarifin makro ve kalori değerleri hedeflere göre optimize ediliyor...')
   const { knowledgeBase, validationError, retryCount } = state
   const { planFacts, behaviorFacts } = knowledgeBase
   const mealLines = planFacts.length
@@ -155,6 +164,8 @@ async function dietitianWorkerNode(state) {
 }
 
 async function financeWorkerNode(state) {
+  emitLog('💼 Finans Ajanı: Porsiyon maliyeti ve tasarruf oranı hesaplanıyor...')
+  emitLog('📊 Finans Ajanı: Kiler verileri israf analizi için işleniyor...')
   const { knowledgeBase, validationError, retryCount } = state
   const { pantryFacts, financeFacts, behaviorFacts } = knowledgeBase
   const correctionLine = validationError && retryCount > 0
@@ -185,6 +196,7 @@ async function financeWorkerNode(state) {
 // ── 7. Validator Node (Self-Correction Loop) ─────────────────────────────────
 
 function validatorNode(state) {
+  emitLog('🔎 Doğrulayıcı: Çıktı güvenilirlik ve tutarlılık kontrolünden geçiriliyor...')
   const { result, workerType, retryCount } = state
   if (!result || typeof result !== 'object') {
     return { validationError: 'Ajan gecerli sonuc dondurmedi.', retryCount: retryCount + 1 }
@@ -255,6 +267,13 @@ const kapyaGraph = new StateGraph(KapyaState)
 export async function runInsightAgent({ trigger, plannedMeals, pantryProducts, financeData, userContext }) {
   const knowledgeBase = buildKnowledgeBase({ trigger, plannedMeals, pantryProducts, financeData, userContext })
   const state = await kapyaGraph.invoke({ knowledgeBase })
+  return state.result
+}
+
+// Streaming variant — emitFn is called with each log message in real-time.
+export async function runInsightAgentStreaming({ trigger, plannedMeals, pantryProducts, financeData, userContext }, emitFn) {
+  const knowledgeBase = buildKnowledgeBase({ trigger, plannedMeals, pantryProducts, financeData, userContext })
+  const state = await emitterStorage.run(emitFn, () => kapyaGraph.invoke({ knowledgeBase }))
   return state.result
 }
 

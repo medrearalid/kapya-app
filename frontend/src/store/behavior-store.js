@@ -20,6 +20,11 @@ export const useBehaviorStore = create(
       cookedRecipes: [],
       wastedIngredients: [],
 
+      // Agent log state (not persisted — UI only)
+      currentAgentLog: '',
+      setAgentLog: (message) => set({ currentAgentLog: message }),
+      clearAgentLog: () => set({ currentAgentLog: '' }),
+
       trackRecipeSwiped: (recipeName) =>
         set((state) => ({
           swipedRecipes: addUnique(state.swipedRecipes, recipeName, MAX_HISTORY_SIZE),

@@ -1,8 +1,9 @@
 import { Router } from 'express'
-import { postInsightTrigger } from '../controllers/insights-controller.js'
+import { postInsightTrigger, streamInsightTrigger } from '../controllers/insights-controller.js'
 
 const insightsRouter = Router()
 
 insightsRouter.post('/trigger', postInsightTrigger)
+insightsRouter.post('/stream', streamInsightTrigger)
 
 export default insightsRouter

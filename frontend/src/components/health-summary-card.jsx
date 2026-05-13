@@ -1,9 +1,9 @@
-import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { motion } from 'framer-motion'
 import { Activity } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { useEffect, useState } from 'react'
-import { getHealthSummary } from '../services/insights-api'
+import CookingLoader from './cooking-loader'
+import { streamInsight } from '../services/insights-api'
 import { useBehaviorStore } from '../store/behavior-store'
 
 function StatPill({ label, value, unit }) {
@@ -29,25 +29,29 @@ StatPill.propTypes = {
 function HealthSummaryCard({ plannedMeals }) {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [agentLog, setAgentLog] = useState('')
   const buildUserContext = useBehaviorStore((s) => s.buildUserContext)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setAgentLog('')
 
-    getHealthSummary({ plannedMeals, userContext: buildUserContext() })
+    streamInsight(
+      { trigger: 'planner_page', plannedMeals, userContext: buildUserContext() },
+      (msg) => { if (!cancelled) setAgentLog(msg) },
+    )
       .then((data) => { if (!cancelled) setSummary(data) })
       .catch(() => { if (!cancelled) setSummary(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => { if (!cancelled) { setLoading(false); setAgentLog('') } })
 
     return () => { cancelled = true }
   }, [plannedMeals, buildUserContext])
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/60 bg-emerald-50/60 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-        <DotLottieReact src="/Cooking.lottie" loop autoplay style={{ width: 40, height: 40 }} />
-        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Haftalik saglik ozeti hazirlaniyor...</span>
+      <div className="flex justify-center rounded-2xl border border-emerald-200/60 bg-emerald-50/60 py-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+        <CookingLoader log={agentLog} />
       </div>
     )
   }
