@@ -1,51 +1,36 @@
-import { runDietitianAgent, runFinanceAgent } from '../services/multi-agent-service.js'
+import { runInsightAgent } from '../services/multi-agent-service.js'
 
-export const postHealthSummary = async (request, response, next) => {
+const VALID_TRIGGERS = new Set(['planner_page', 'wallet_page'])
+
+export const postInsightTrigger = async (request, response, next) => {
   try {
-    const { plannedMeals, userContext } = request.body ?? {}
+    const { trigger, plannedMeals, pantryProducts, financeData, userContext } = request.body ?? {}
 
-    if (plannedMeals !== undefined && !Array.isArray(plannedMeals)) {
+    if (!trigger || !VALID_TRIGGERS.has(String(trigger))) {
       return response.status(400).json({
         success: false,
-        error: 'plannedMeals alani dizi olmalidir.',
+        error: `trigger gecersiz. Kabul edilenler: ${Array.from(VALID_TRIGGERS).join(', ')}`,
       })
     }
 
-    const result = await runDietitianAgent({
+    const result = await runInsightAgent({
+      trigger: String(trigger),
       plannedMeals: Array.isArray(plannedMeals) ? plannedMeals : [],
-      userContext: userContext && typeof userContext === 'object' ? userContext : {},
-    })
-
-    const uiData = { ...result }
-    delete uiData._reasoning
-
-    return response.status(200).json({ success: true, data: uiData })
-  } catch (error) {
-    next(error)
-  }
-}
-
-export const postFinanceSummary = async (request, response, next) => {
-  try {
-    const { pantryProducts, financeData, userContext } = request.body ?? {}
-
-    if (pantryProducts !== undefined && !Array.isArray(pantryProducts)) {
-      return response.status(400).json({
-        success: false,
-        error: 'pantryProducts alani dizi olmalidir.',
-      })
-    }
-
-    const result = await runFinanceAgent({
       pantryProducts: Array.isArray(pantryProducts) ? pantryProducts : [],
       financeData: financeData && typeof financeData === 'object' ? financeData : {},
       userContext: userContext && typeof userContext === 'object' ? userContext : {},
     })
 
-    const uiDataFin = { ...result }
-    delete uiDataFin._reasoning
+    if (!result) {
+      const serviceError = new Error('Supervisor ajan analiz uretmedi.')
+      serviceError.statusCode = 503
+      throw serviceError
+    }
 
-    return response.status(200).json({ success: true, data: uiDataFin })
+    const uiData = { ...result }
+    delete uiData._reasoning
+
+    return response.status(200).json({ success: true, data: uiData })
   } catch (error) {
     next(error)
   }

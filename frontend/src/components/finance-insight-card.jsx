@@ -1,5 +1,6 @@
+import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { motion } from 'framer-motion'
-import { LoaderCircle, Wallet } from 'lucide-react'
+import { Wallet } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { useEffect, useState } from 'react'
 import { getFinanceSummary } from '../services/insights-api'
@@ -52,8 +53,8 @@ function FinanceInsightCard({ pantryProducts, financeData }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-kapya-200/60 bg-kapya-50/60 px-4 py-3 dark:border-kapya-800/40 dark:bg-kapya-950/20">
-        <LoaderCircle className="h-4 w-4 animate-spin text-kapya-600 dark:text-kapya-400" aria-hidden="true" />
+      <div className="flex items-center gap-3 rounded-2xl border border-kapya-200/60 bg-kapya-50/60 px-4 py-3 dark:border-kapya-800/40 dark:bg-kapya-950/20">
+        <DotLottieReact src="/Cooking.lottie" loop autoplay style={{ width: 40, height: 40 }} />
         <span className="text-xs font-medium text-kapya-700 dark:text-kapya-300">Finans analizi hazirlaniyor...</span>
       </div>
     )

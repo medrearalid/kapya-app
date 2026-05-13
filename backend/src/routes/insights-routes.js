@@ -1,9 +1,8 @@
 import { Router } from 'express'
-import { postFinanceSummary, postHealthSummary } from '../controllers/insights-controller.js'
+import { postInsightTrigger } from '../controllers/insights-controller.js'
 
 const insightsRouter = Router()
 
-insightsRouter.post('/health-summary', postHealthSummary)
-insightsRouter.post('/finance-summary', postFinanceSummary)
+insightsRouter.post('/trigger', postInsightTrigger)
 
 export default insightsRouter
