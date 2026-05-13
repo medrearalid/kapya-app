@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import insightsRouter from './routes/insights-routes.js'
 import recipeAgentRouter from './routes/recipe-agent-routes.js'
 import receiptRouter from './routes/receipt-routes.js'
 
@@ -22,6 +23,7 @@ app.get('/health', (_request, response) => {
 })
 
 app.use('/api/ai/recipes', recipeAgentRouter)
+app.use('/api/ai/insights', insightsRouter)
 app.use('/api/receipts', receiptRouter)
 
 app.use((error, _request, response, _next) => {

@@ -3,6 +3,7 @@ import { animate, motion } from 'framer-motion'
 import { PiggyBank, TrendingUp } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import FinanceInsightCard from '../components/finance-insight-card'
 import { usePantryStore } from '../store/pantry-store'
 
 const getCurrentMonthKey = () => new Date().toISOString().slice(0, 7)
@@ -38,6 +39,21 @@ AnimatedCurrency.propTypes = {
 function WalletPage() {
   const { t } = useTranslation()
   const finance = usePantryStore((state) => state.finance)
+  const products = usePantryStore((state) => state.products)
+
+  const pantryProducts = useMemo(
+    () =>
+      (Array.isArray(products) ? products : [])
+        .filter((p) => String(p?.status ?? '') !== 'tukendi')
+        .map((p) => ({
+          name: String(p?.name ?? '').trim(),
+          quantity: Number(p?.quantity) || 0,
+          unit: String(p?.unit ?? 'adet').trim(),
+          birimMaliyet: Number(p?.birimMaliyet) || 0,
+        }))
+        .filter((p) => p.name),
+    [products],
+  )
 
   const monthKey = getCurrentMonthKey()
   const currentMonthSpending = useMemo(
@@ -97,6 +113,8 @@ function WalletPage() {
           {t('wallet.preventedWasteDescription')}
         </p>
       </motion.article>
+
+      <FinanceInsightCard pantryProducts={pantryProducts} financeData={finance ?? {}} />
     </section>
   )
 }

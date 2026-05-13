@@ -86,6 +86,7 @@
     "filterHighProtein": "Yüksek Protein",
     "filterOnePot": "Tek Tencere",
     "applyFiltersButton": "Filtreleri Uygula",
+    "generateWithSelectionsButton": "Seçimlerle Üret",
     "generatePersonalizedButton": "Bana Özel Tarif Üret",
     "smartHubValidation": "En az bir kriter seç veya hızlı arama yaz.",
     "loadingInspectingPantry": "Şef bıçaklarını hazırlıyor...",

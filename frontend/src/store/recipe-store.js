@@ -26,6 +26,24 @@ const normalizeRecipeNameKey = (value) =>
     .toLocaleLowerCase('tr-TR')
     .replaceAll(/\s+/g, ' ')
 
+const normalizeImageCacheMap = (cacheInput) => {
+  const cache = cacheInput && typeof cacheInput === 'object' ? cacheInput : {}
+  const normalizedCache = {}
+
+  for (const [recipeName, imageUrl] of Object.entries(cache)) {
+    const key = normalizeRecipeNameKey(recipeName)
+    const value = normalizeText(imageUrl)
+
+    if (!key || !value) {
+      continue
+    }
+
+    normalizedCache[key] = value
+  }
+
+  return normalizedCache
+}
+
 const normalizeIngredient = (ingredient) => {
   const isim = normalizeText(ingredient?.isim ?? ingredient?.name)
   if (!isim) {
@@ -149,6 +167,23 @@ const mergeRecipes = ({ currentRecipes, incomingRecipe, source }) => {
   return nextRecipes
 }
 
+const buildImageCacheFromRecipes = (recipes) => {
+  const imageCache = {}
+
+  for (const recipe of Array.isArray(recipes) ? recipes : []) {
+    const recipeNameKey = normalizeRecipeNameKey(recipe?.isim)
+    const imageUrl = normalizeText(recipe?.nanoBananaGorseli)
+
+    if (!recipeNameKey || !imageUrl) {
+      continue
+    }
+
+    imageCache[recipeNameKey] = imageUrl
+  }
+
+  return imageCache
+}
+
 export const toPlannerRecipe = (recipeInput) => {
   const recipe = normalizeIncomingRecipe(recipeInput)
   if (!recipe) {
@@ -176,6 +211,7 @@ export const useRecipeStore = create(
   persist(
     (set, get) => ({
       savedRecipes: [],
+      imageCacheByRecipeName: {},
 
       saveRecipe: (recipeInput, options = {}) => {
         let savedRecipe = null
@@ -201,6 +237,10 @@ export const useRecipeStore = create(
 
           return {
             savedRecipes: updatedRecipes,
+            imageCacheByRecipeName: {
+              ...state.imageCacheByRecipeName,
+              ...buildImageCacheFromRecipes(updatedRecipes),
+            },
           }
         })
 
@@ -221,8 +261,38 @@ export const useRecipeStore = create(
 
           return {
             savedRecipes: nextRecipes,
+            imageCacheByRecipeName: {
+              ...state.imageCacheByRecipeName,
+              ...buildImageCacheFromRecipes(nextRecipes),
+            },
           }
         }),
+
+      cacheRecipeImage: (recipeName, imageUrl) =>
+        set((state) => {
+          const recipeNameKey = normalizeRecipeNameKey(recipeName)
+          const normalizedImageUrl = normalizeText(imageUrl)
+
+          if (!recipeNameKey || !normalizedImageUrl) {
+            return state
+          }
+
+          return {
+            imageCacheByRecipeName: {
+              ...state.imageCacheByRecipeName,
+              [recipeNameKey]: normalizedImageUrl,
+            },
+          }
+        }),
+
+      getCachedRecipeImage: (recipeName) => {
+        const recipeNameKey = normalizeRecipeNameKey(recipeName)
+        if (!recipeNameKey) {
+          return ''
+        }
+
+        return String(get().imageCacheByRecipeName?.[recipeNameKey] ?? '').trim()
+      },
 
       toggleFavorite: (recipeId) =>
         set((state) => ({
@@ -248,8 +318,25 @@ export const useRecipeStore = create(
     }),
     {
       name: RECIPE_STORAGE_KEY,
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState && typeof persistedState === 'object' ? persistedState : {}
+        const persistedRecipes = Array.isArray(persisted.savedRecipes) ? persisted.savedRecipes : []
+        const persistedCache = normalizeImageCacheMap(persisted.imageCacheByRecipeName)
+        const recipesCache = buildImageCacheFromRecipes(persistedRecipes)
+
+        return {
+          ...currentState,
+          ...persisted,
+          savedRecipes: persistedRecipes,
+          imageCacheByRecipeName: {
+            ...persistedCache,
+            ...recipesCache,
+          },
+        }
+      },
       partialize: (state) => ({
         savedRecipes: state.savedRecipes,
+        imageCacheByRecipeName: state.imageCacheByRecipeName,
       }),
     },
   ),

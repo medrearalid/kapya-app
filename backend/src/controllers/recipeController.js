@@ -52,6 +52,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
     const preferences = request.body?.preferences
     const isLucky = request.body?.isLucky === true
     const mealType = String(request.body?.mealType ?? '').trim().toLowerCase()
+    const imageCacheByRecipeName = request.body?.imageCacheByRecipeName
 
     if (pantryStock !== undefined && !Array.isArray(pantryStock)) {
       return response.status(400).json({
@@ -81,6 +82,16 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       })
     }
 
+    if (
+      imageCacheByRecipeName !== undefined &&
+      (imageCacheByRecipeName === null || typeof imageCacheByRecipeName !== 'object')
+    ) {
+      return response.status(400).json({
+        success: false,
+        error: 'Gecersiz istek govdesi. imageCacheByRecipeName alani obje olmalidir.',
+      })
+    }
+
     const hasAnySmartCriteria =
       Boolean(mealName) ||
       isLucky ||
@@ -103,6 +114,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       preferences,
       isLucky,
       mealType,
+      imageCacheByRecipeName,
     })
 
     return response.status(200).json({

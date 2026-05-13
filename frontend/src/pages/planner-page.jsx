@@ -3,9 +3,11 @@ import PropTypes from 'prop-types'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import HealthSummaryCard from '../components/health-summary-card'
 import PlannedMealCard from '../components/planned-meal-card'
 import TapButton from '../components/tap-button'
 import { generateRecipeByName } from '../services/recipe-agent-api'
+import { useBehaviorStore } from '../store/behavior-store'
 import { usePantryStore } from '../store/pantry-store'
 import { usePlannerStore } from '../store/planner-store'
 import { toPlannerRecipe, useRecipeStore } from '../store/recipe-store'
@@ -191,6 +193,8 @@ function PlannerPage() {
   const savedRecipes = useRecipeStore((state) => state.savedRecipes)
   const saveRecipe = useRecipeStore((state) => state.saveRecipe)
 
+  const trackRecipeCooked = useBehaviorStore((s) => s.trackRecipeCooked)
+
   const [isAutoPlanSheetOpen, setIsAutoPlanSheetOpen] = useState(false)
   const [autoPlanDayCount, setAutoPlanDayCount] = useState(3)
   const [autoPlanPersonCount, setAutoPlanPersonCount] = useState(2)
@@ -282,6 +286,7 @@ function PlannerPage() {
     })
 
     markPlannedMealCompleted(plannedMeal.id)
+    trackRecipeCooked(plannedMeal?.recipe?.tarifAdi)
     showToast(t('planner.completedToast', { name: plannedMeal?.recipe?.tarifAdi || t('planner.meal') }))
   }
 
@@ -416,6 +421,8 @@ function PlannerPage() {
           {t('planner.autoPlanButton')}
         </TapButton>
       </header>
+
+      <HealthSummaryCard plannedMeals={plannedMeals} />
 
       <div className="no-scrollbar -mx-1 overflow-x-auto px-1">
         <div className="flex w-max min-w-full gap-2 pb-1">

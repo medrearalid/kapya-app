@@ -86,6 +86,7 @@
     "filterHighProtein": "High Protein",
     "filterOnePot": "One Pot",
     "applyFiltersButton": "Apply Filters",
+    "generateWithSelectionsButton": "Generate With Selections",
     "generatePersonalizedButton": "Generate My Personal Recipe",
     "smartHubValidation": "Select at least one criteria or type a quick search.",
     "loadingInspectingPantry": "Chef is checking the kitchen stock...",

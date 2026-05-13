@@ -2,6 +2,35 @@ const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/
 
 const buildApiUrl = (path) => `${API_BASE_URL}${path}`
 
+const buildCompactImageCachePayload = (imageCacheByRecipeName) => {
+  if (!imageCacheByRecipeName || typeof imageCacheByRecipeName !== 'object') {
+    return {}
+  }
+
+  const compactEntries = []
+
+  for (const [recipeName, imageUrl] of Object.entries(imageCacheByRecipeName)) {
+    const normalizedName = String(recipeName ?? '').trim()
+    const normalizedUrl = String(imageUrl ?? '').trim()
+
+    if (!normalizedName || !normalizedUrl) {
+      continue
+    }
+
+    // Keep payload lean: only short remote URLs, exclude large data-uri blobs.
+    if (!/^https?:\/\//i.test(normalizedUrl) || normalizedUrl.length > 1024) {
+      continue
+    }
+
+    compactEntries.push([normalizedName, normalizedUrl])
+    if (compactEntries.length >= 60) {
+      break
+    }
+  }
+
+  return Object.fromEntries(compactEntries)
+}
+
 export const generateWasteSaverRecipes = async ({
   budgetProfile,
   pantryStock,
@@ -35,7 +64,14 @@ export const generateWasteSaverRecipes = async ({
     throw new Error(responsePayload?.error || 'RECIPE_GENERATION_FAILED')
   }
 
-  return responsePayload?.data
+  const data = responsePayload?.data
+  if (data?.error === true) {
+    const hallucinationError = new Error(data.message || 'HALLUCINATION_ERROR')
+    hallucinationError.code = 'HALLUCINATION'
+    throw hallucinationError
+  }
+
+  return data
 }
 
 export const generateRecipeByName = async ({
@@ -45,6 +81,7 @@ export const generateRecipeByName = async ({
   preferences,
   isLucky,
   mealType,
+  imageCacheByRecipeName,
 }) => {
   const payload = {
     mealName: String(mealName ?? '').trim(),
@@ -71,6 +108,11 @@ export const generateRecipeByName = async ({
     payload.mealType = normalizedMealType
   }
 
+  const compactImageCacheByRecipeName = buildCompactImageCachePayload(imageCacheByRecipeName)
+  if (Object.keys(compactImageCacheByRecipeName).length > 0) {
+    payload.imageCacheByRecipeName = compactImageCacheByRecipeName
+  }
+
   const response = await fetch(buildApiUrl('/api/ai/recipes/by-name'), {
     method: 'POST',
     headers: {
@@ -84,5 +126,12 @@ export const generateRecipeByName = async ({
     throw new Error(responsePayload?.error || 'RECIPE_BY_NAME_FAILED')
   }
 
-  return responsePayload?.data?.tarif || null
+  const data = responsePayload?.data
+  if (data?.error === true) {
+    const hallucinationError = new Error(data.message || 'HALLUCINATION_ERROR')
+    hallucinationError.code = 'HALLUCINATION'
+    throw hallucinationError
+  }
+
+  return data?.tarif || null
 }

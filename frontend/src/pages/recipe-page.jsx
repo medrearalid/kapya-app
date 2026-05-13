@@ -9,6 +9,7 @@ import {
   Users,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import PropTypes from 'prop-types'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +22,8 @@ import { useRecipeStore } from '../store/recipe-store'
 const RECIPE_IMAGE_PLACEHOLDER = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fef3c7"/><stop offset="100%" stop-color="#fcd34d"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><text x="512" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" fill="#78350f">CHEF</text></svg>',
 )}`
+
+const COOKING_LOTTIE_SRC = '/Cooking.lottie'
 
 const VIEW_MODES = {
   GRID: 'grid',
@@ -129,12 +132,21 @@ const buildCategorizedIngredients = (products) => {
     .sort((left, right) => left.category.localeCompare(right.category, 'tr'))
 }
 
-function OptionCard({ title, description, icon: Icon, onClick, isActive, disabled = false }) {
+function OptionCard({
+  title,
+  description,
+  icon: Icon,
+  onClick,
+  isActive,
+  disabled = false,
+  loading = false,
+  loadingLabel = 'Loading',
+}) {
   return (
     <motion.button
       type="button"
       whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.985 }}
+      whileTap={{ scale: 0.95 }}
       onClick={onClick}
       disabled={disabled}
       className={[
@@ -145,12 +157,26 @@ function OptionCard({ title, description, icon: Icon, onClick, isActive, disable
         disabled ? 'cursor-not-allowed opacity-70' : '',
       ].join(' ')}
     >
-      <div className="inline-flex items-center gap-2 rounded-xl bg-white/75 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:bg-slate-800/75 dark:text-slate-200">
-        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>{title}</span>
-      </div>
+      {loading ? (
+        <div className="flex min-h-[94px] items-center justify-center">
+          <DotLottieReact
+            src={COOKING_LOTTIE_SRC}
+            loop
+            autoplay
+            className="h-32 w-32 bg-transparent"
+            aria-label={loadingLabel}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="inline-flex items-center gap-2 rounded-xl bg-white/75 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:bg-slate-800/75 dark:text-slate-200">
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{title}</span>
+          </div>
 
-      <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">{description}</p>
+          <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">{description}</p>
+        </>
+      )}
 
       <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-kapya-100/55 blur-2xl transition group-hover:bg-kapya-200/65 dark:bg-kapya-900/20" />
     </motion.button>
@@ -164,6 +190,8 @@ OptionCard.propTypes = {
   onClick: PropTypes.func.isRequired,
   isActive: PropTypes.bool.isRequired,
   disabled: PropTypes.bool,
+  loading: PropTypes.bool,
+  loadingLabel: PropTypes.string,
 }
 
 function FocusIngredientsPanel({
@@ -173,6 +201,8 @@ function FocusIngredientsPanel({
   focusedIngredientKeySet,
   onCategoryChange,
   onToggleIngredient,
+  onGenerate,
+  isGenerating,
   t,
 }) {
   const activeGroup =
@@ -273,6 +303,25 @@ function FocusIngredientsPanel({
                   )}
                 </motion.div>
               </AnimatePresence>
+
+              <TapButton
+                type="button"
+                onClick={onGenerate}
+                disabled={isGenerating}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 py-3 text-sm font-semibold text-white hover:bg-kapya-700 disabled:opacity-85"
+              >
+                {isGenerating ? (
+                  <DotLottieReact
+                    src={COOKING_LOTTIE_SRC}
+                    loop
+                    autoplay
+                    className="h-14 w-14 bg-transparent"
+                    aria-label={t('recipes.loadingFinalizing')}
+                  />
+                ) : (
+                  t('recipes.generateWithSelectionsButton')
+                )}
+              </TapButton>
             </>
           )}
         </motion.article>
@@ -293,10 +342,12 @@ FocusIngredientsPanel.propTypes = {
   focusedIngredientKeySet: PropTypes.instanceOf(Set).isRequired,
   onCategoryChange: PropTypes.func.isRequired,
   onToggleIngredient: PropTypes.func.isRequired,
+  onGenerate: PropTypes.func.isRequired,
+  isGenerating: PropTypes.bool.isRequired,
   t: PropTypes.func.isRequired,
 }
 
-function PreferenceDrawer({ isOpen, preferences, onTogglePreference, onClose, t }) {
+function PreferenceDrawer({ isOpen, preferences, onTogglePreference, onClose, onGenerate, isGenerating, t }) {
   const selectedPreferenceSet = useMemo(() => new Set(preferences), [preferences])
 
   return (
@@ -359,10 +410,23 @@ function PreferenceDrawer({ isOpen, preferences, onTogglePreference, onClose, t 
 
             <TapButton
               type="button"
-              onClick={onClose}
+              onClick={onGenerate}
+              disabled={isGenerating}
               className="mt-3 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white dark:bg-kapya-700"
             >
-              {t('recipes.applyFiltersButton')}
+              {isGenerating ? (
+                <span className="flex justify-center">
+                  <DotLottieReact
+                    src={COOKING_LOTTIE_SRC}
+                    loop
+                    autoplay
+                    className="h-14 w-14 bg-transparent"
+                    aria-label={t('recipes.loadingFinalizing')}
+                  />
+                </span>
+              ) : (
+                t('recipes.generateWithSelectionsButton')
+              )}
             </TapButton>
           </motion.aside>
         </>
@@ -376,6 +440,8 @@ PreferenceDrawer.propTypes = {
   preferences: PropTypes.arrayOf(PropTypes.string).isRequired,
   onTogglePreference: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
+  onGenerate: PropTypes.func.isRequired,
+  isGenerating: PropTypes.bool.isRequired,
   t: PropTypes.func.isRequired,
 }
 
@@ -480,7 +546,7 @@ function RecipeLibrarySection({ recipeList, viewMode, setViewMode, onSelectRecip
               loading="lazy"
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 text-white">
-              <p className="line-clamp-2 text-sm font-semibold">{recipe.isim}</p>
+              <p className="line-clamp-2 break-words text-sm font-semibold leading-tight">{recipe.isim}</p>
               <p className="mt-1 text-[11px] text-white/90">{recipe.sure}</p>
             </div>
           </TapButton>
@@ -627,8 +693,10 @@ function RecipePage() {
   const addRecentRecipeNames = usePantryStore((state) => state.addRecentRecipeNames)
   const setGeneratedRecipes = usePantryStore((state) => state.setGeneratedRecipes)
   const setAgentInsight = usePantryStore((state) => state.setAgentInsight)
+  const showToast = usePantryStore((state) => state.showToast)
   const savedRecipes = useRecipeStore((state) => state.savedRecipes)
   const saveRecipe = useRecipeStore((state) => state.saveRecipe)
+  const imageCacheByRecipeName = useRecipeStore((state) => state.imageCacheByRecipeName)
 
   const [queryText, setQueryText] = useState('')
   const [viewMode, setViewMode] = useState(VIEW_MODES.GRID)
@@ -642,6 +710,7 @@ function RecipePage() {
   const [isLoadingRecipe, setIsLoadingRecipe] = useState(false)
   const [isRefreshingChefSuggestion, setIsRefreshingChefSuggestion] = useState(false)
   const [loadingStepIndex, setLoadingStepIndex] = useState(0)
+  const [loadingSource, setLoadingSource] = useState('')
 
   const loadingTexts = useMemo(() => LOADING_TEXT_KEYS.map((key) => t(key)), [t])
   const focusedIngredientKeySet = useMemo(
@@ -767,11 +836,17 @@ function RecipePage() {
         ajanMesaji: String(recipeData?.ajanMesaji ?? '').trim(),
       })
     } catch (error) {
-      setRefreshError(
-        error?.message === 'RECIPE_GENERATION_FAILED'
-          ? t('recipes.refreshError')
-          : error?.message || t('recipes.refreshError'),
-      )
+      const isHallucination = error?.code === 'HALLUCINATION'
+      let displayMessage = t('recipes.refreshError')
+      if (isHallucination) {
+        displayMessage = 'Şef tarifte bir mantık hatası yaptı, en iyi sonucu vermek için işlemi iptal ettik. Lütfen tekrar deneyin.'
+      } else if (error?.message && error.message !== 'RECIPE_GENERATION_FAILED') {
+        displayMessage = error.message
+      }
+      setRefreshError(displayMessage)
+      if (isHallucination) {
+        showToast(displayMessage)
+      }
     } finally {
       setIsRefreshingChefSuggestion(false)
     }
@@ -800,7 +875,7 @@ function RecipePage() {
     })
   }
 
-  const handleGenerateRecipeByName = async ({ luckyMode = false } = {}) => {
+  const handleGenerateRecipeByName = async ({ luckyMode = false, source = 'general' } = {}) => {
     const mealName = String(queryText ?? '').trim()
 
     if (isLoadingRecipe) {
@@ -814,6 +889,7 @@ function RecipePage() {
 
     setLoadingStepIndex(0)
     setIsLoadingRecipe(true)
+    setLoadingSource(source)
     setRequestError('')
 
     try {
@@ -823,6 +899,7 @@ function RecipePage() {
         focusedIngredients,
         preferences,
         isLucky: luckyMode,
+        imageCacheByRecipeName,
       })
 
       if (!generatedRecipe) {
@@ -841,15 +918,26 @@ function RecipePage() {
         })
       }
     } catch (error) {
-      setRequestError(
-        error?.message === 'RECIPE_BY_NAME_FAILED'
-          ? t('recipes.byNameError')
-          : error?.message || t('recipes.byNameError'),
-      )
+      const isHallucination = error?.code === 'HALLUCINATION'
+      let displayMessage = t('recipes.byNameError')
+      if (isHallucination) {
+        displayMessage = 'Şef tarifte bir mantık hatası yaptı, en iyi sonucu vermek için işlemi iptal ettik. Lütfen tekrar deneyin.'
+      } else if (error?.message && error.message !== 'RECIPE_BY_NAME_FAILED') {
+        displayMessage = error.message
+      }
+      setRequestError(displayMessage)
+      if (isHallucination) {
+        showToast(displayMessage)
+      }
     } finally {
       setIsLoadingRecipe(false)
+      setLoadingSource('')
     }
   }
+
+  const isLuckyCardLoading = isLoadingRecipe && loadingSource === 'lucky'
+  const isFocusPanelLoading = isLoadingRecipe && loadingSource === 'focus-panel'
+  const isFilterPanelLoading = isLoadingRecipe && loadingSource === 'filter-panel'
 
   return (
     <section className="space-y-4 pb-20">
@@ -950,9 +1038,11 @@ function RecipePage() {
             title={`🎲 ${t('recipes.luckyCardTitle')}`}
             description={t('recipes.luckyCardDescription')}
             icon={Sparkles}
-            onClick={() => handleGenerateRecipeByName({ luckyMode: true })}
+            onClick={() => handleGenerateRecipeByName({ luckyMode: true, source: 'lucky' })}
             isActive={false}
             disabled={isLoadingRecipe}
+            loading={isLuckyCardLoading}
+            loadingLabel={loadingTexts[loadingStepIndex]}
           />
         </div>
 
@@ -963,6 +1053,8 @@ function RecipePage() {
           focusedIngredientKeySet={focusedIngredientKeySet}
           onCategoryChange={setFocusedCategory}
           onToggleIngredient={toggleFocusedIngredient}
+          onGenerate={() => handleGenerateRecipeByName({ source: 'focus-panel' })}
+          isGenerating={isFocusPanelLoading}
           t={t}
         />
 
@@ -978,35 +1070,6 @@ function RecipePage() {
             ))}
           </div>
         ) : null}
-
-        <TapButton
-          type="button"
-          onClick={() => handleGenerateRecipeByName()}
-          disabled={isLoadingRecipe}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 py-3 text-sm font-semibold text-white hover:bg-kapya-700 disabled:cursor-not-allowed disabled:opacity-85"
-        >
-          {isLoadingRecipe ? (
-            <>
-              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={loadingTexts[loadingStepIndex]}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                >
-                  {loadingTexts[loadingStepIndex]}
-                </motion.span>
-              </AnimatePresence>
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              {t('recipes.generatePersonalizedButton')}
-            </>
-          )}
-        </TapButton>
 
         {requestError ? (
           <p className="text-xs font-semibold text-kapya-900 dark:text-kapya-300">{requestError}</p>
@@ -1025,6 +1088,8 @@ function RecipePage() {
         isOpen={isFilterDrawerOpen}
         preferences={preferences}
         onTogglePreference={togglePreference}
+        onGenerate={() => handleGenerateRecipeByName({ source: 'filter-panel' })}
+        isGenerating={isFilterPanelLoading}
         onClose={() => setIsFilterDrawerOpen(false)}
         t={t}
       />
