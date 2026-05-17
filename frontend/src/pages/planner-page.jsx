@@ -11,6 +11,7 @@ import { useBehaviorStore } from '../store/behavior-store'
 import { usePantryStore } from '../store/pantry-store'
 import { usePlannerStore } from '../store/planner-store'
 import { toPlannerRecipe, useRecipeStore } from '../store/recipe-store'
+import { useMediaQuery } from '../utils/use-media-query'
 
 const mealTypeOrder = ['kahvalti', 'ogle', 'aksam']
 
@@ -104,13 +105,26 @@ const getMealTypeLabel = (mealType, t) => {
 }
 
 function AutoPlanSheet({ isOpen, dayCount, personCount, onDayCountChange, onPersonCountChange, onClose, onConfirm, t }) {
+  const isDesktopViewport = useMediaQuery('(min-width: 768px)')
+
   if (!isOpen) {
     return null
   }
 
   return (
-    <dialog open className="fixed inset-0 z-[80] flex items-end bg-black/45 p-3 sm:p-6">
-      <div className="glass-panel mx-auto w-full max-w-md rounded-2xl border border-white/60 bg-white/95 p-4 dark:border-slate-700/60 dark:bg-slate-900/95">
+    <dialog
+      open
+      className={[
+        'fixed inset-0 z-[80] flex bg-black/45 p-3 sm:p-6',
+        isDesktopViewport ? 'items-center justify-center' : 'items-end',
+      ].join(' ')}
+    >
+      <div
+        className={[
+          'glass-panel mx-auto w-full max-w-md border border-white/60 bg-white/95 p-4 dark:border-slate-700/60 dark:bg-slate-900/95',
+          isDesktopViewport ? 'rounded-3xl' : 'rounded-2xl',
+        ].join(' ')}
+      >
         <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
           {t('planner.autoPlanTitle')}
         </p>
@@ -401,7 +415,7 @@ function PlannerPage() {
   }
 
   return (
-    <section className="space-y-4 pb-20">
+    <section className="space-y-4 pb-20 md:pb-6">
       <header className="flex items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sand-700 dark:text-slate-400">

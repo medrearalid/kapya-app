@@ -2,35 +2,6 @@ const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/
 
 const buildApiUrl = (path) => `${API_BASE_URL}${path}`
 
-const buildCompactImageCachePayload = (imageCacheByRecipeName) => {
-  if (!imageCacheByRecipeName || typeof imageCacheByRecipeName !== 'object') {
-    return {}
-  }
-
-  const compactEntries = []
-
-  for (const [recipeName, imageUrl] of Object.entries(imageCacheByRecipeName)) {
-    const normalizedName = String(recipeName ?? '').trim()
-    const normalizedUrl = String(imageUrl ?? '').trim()
-
-    if (!normalizedName || !normalizedUrl) {
-      continue
-    }
-
-    // Keep payload lean: only short remote URLs, exclude large data-uri blobs.
-    if (!/^https?:\/\//i.test(normalizedUrl) || normalizedUrl.length > 1024) {
-      continue
-    }
-
-    compactEntries.push([normalizedName, normalizedUrl])
-    if (compactEntries.length >= 60) {
-      break
-    }
-  }
-
-  return Object.fromEntries(compactEntries)
-}
-
 export const generateWasteSaverRecipes = async ({
   budgetProfile,
   pantryStock,
@@ -76,12 +47,13 @@ export const generateWasteSaverRecipes = async ({
 
 export const generateRecipeByName = async ({
   mealName,
+  dishCategory,
   pantryStock,
   focusedIngredients,
   preferences,
   isLucky,
   mealType,
-  imageCacheByRecipeName,
+  recentRecipeNames,
 }) => {
   const payload = {
     mealName: String(mealName ?? '').trim(),
@@ -99,6 +71,13 @@ export const generateRecipeByName = async ({
     payload.preferences = preferences
   }
 
+  if (Array.isArray(recentRecipeNames) && recentRecipeNames.length > 0) {
+    payload.recentRecipeNames = recentRecipeNames
+      .map((name) => String(name ?? '').trim())
+      .filter(Boolean)
+      .slice(0, 20)
+  }
+
   if (isLucky === true) {
     payload.isLucky = true
   }
@@ -108,9 +87,9 @@ export const generateRecipeByName = async ({
     payload.mealType = normalizedMealType
   }
 
-  const compactImageCacheByRecipeName = buildCompactImageCachePayload(imageCacheByRecipeName)
-  if (Object.keys(compactImageCacheByRecipeName).length > 0) {
-    payload.imageCacheByRecipeName = compactImageCacheByRecipeName
+  const normalizedDishCategory = String(dishCategory ?? '').trim()
+  if (normalizedDishCategory) {
+    payload.dishCategory = normalizedDishCategory
   }
 
   const response = await fetch(buildApiUrl('/api/ai/recipes/by-name'), {

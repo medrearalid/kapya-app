@@ -3,8 +3,31 @@ import { persist } from 'zustand/middleware'
 
 const BEHAVIOR_STORAGE_KEY = 'kapya-behavior-store'
 const MAX_HISTORY_SIZE = 50
+const INSIGHT_TRIGGERS = Object.freeze(['planner_page', 'wallet_page'])
 
 const toNormalizedName = (value) => String(value ?? '').trim()
+
+const createEmptyInsightState = () => ({
+  planner_page: {
+    loading: false,
+    requestKey: '',
+    log: '',
+    data: null,
+    error: '',
+  },
+  wallet_page: {
+    loading: false,
+    requestKey: '',
+    log: '',
+    data: null,
+    error: '',
+  },
+})
+
+const normalizeInsightTrigger = (trigger) =>
+  INSIGHT_TRIGGERS.includes(String(trigger ?? '').trim())
+    ? String(trigger ?? '').trim()
+    : 'wallet_page'
 
 const addUnique = (list, item, maxSize) => {
   const name = toNormalizedName(item)
@@ -19,11 +42,152 @@ export const useBehaviorStore = create(
       swipedRecipes: [],
       cookedRecipes: [],
       wastedIngredients: [],
+      insightByTrigger: createEmptyInsightState(),
 
       // Agent log state (not persisted — UI only)
       currentAgentLog: '',
       setAgentLog: (message) => set({ currentAgentLog: message }),
       clearAgentLog: () => set({ currentAgentLog: '' }),
+
+      beginInsightStream: (trigger, requestKey) =>
+        set((state) => {
+          const safeTrigger = normalizeInsightTrigger(trigger)
+          const normalizedRequestKey = toNormalizedName(requestKey)
+          const currentInsight = state.insightByTrigger?.[safeTrigger] || {
+            loading: false,
+            requestKey: '',
+            log: '',
+            data: null,
+            error: '',
+          }
+
+          if (
+            normalizedRequestKey &&
+            currentInsight.requestKey === normalizedRequestKey &&
+            (currentInsight.loading || currentInsight.data || currentInsight.error)
+          ) {
+            return state
+          }
+
+          return {
+            currentAgentLog: '',
+            insightByTrigger: {
+              ...state.insightByTrigger,
+              [safeTrigger]: {
+                loading: true,
+                requestKey: normalizedRequestKey,
+                log: '',
+                data: null,
+                error: '',
+              },
+            },
+          }
+        }),
+
+      setInsightLog: (trigger, message) =>
+        set((state) => {
+          const safeTrigger = normalizeInsightTrigger(trigger)
+          const currentInsight = state.insightByTrigger?.[safeTrigger] || {
+            loading: false,
+            requestKey: '',
+            log: '',
+            data: null,
+            error: '',
+          }
+          const normalizedMessage = toNormalizedName(message)
+
+          return {
+            currentAgentLog: normalizedMessage,
+            insightByTrigger: {
+              ...state.insightByTrigger,
+              [safeTrigger]: {
+                ...currentInsight,
+                log: normalizedMessage,
+              },
+            },
+          }
+        }),
+
+      setInsightData: (trigger, data, requestKey) =>
+        set((state) => {
+          const safeTrigger = normalizeInsightTrigger(trigger)
+          const currentInsight = state.insightByTrigger?.[safeTrigger] || {
+            loading: false,
+            requestKey: '',
+            log: '',
+            data: null,
+            error: '',
+          }
+
+          if (
+            requestKey !== undefined &&
+            toNormalizedName(requestKey) &&
+            currentInsight.requestKey !== toNormalizedName(requestKey)
+          ) {
+            return state
+          }
+
+          return {
+            insightByTrigger: {
+              ...state.insightByTrigger,
+              [safeTrigger]: {
+                ...currentInsight,
+                loading: false,
+                data,
+                error: '',
+              },
+            },
+          }
+        }),
+
+      setInsightError: (trigger, errorMessage, requestKey) =>
+        set((state) => {
+          const safeTrigger = normalizeInsightTrigger(trigger)
+          const currentInsight = state.insightByTrigger?.[safeTrigger] || {
+            loading: false,
+            requestKey: '',
+            log: '',
+            data: null,
+            error: '',
+          }
+
+          if (
+            requestKey !== undefined &&
+            toNormalizedName(requestKey) &&
+            currentInsight.requestKey !== toNormalizedName(requestKey)
+          ) {
+            return state
+          }
+
+          return {
+            insightByTrigger: {
+              ...state.insightByTrigger,
+              [safeTrigger]: {
+                ...currentInsight,
+                loading: false,
+                data: null,
+                error: toNormalizedName(errorMessage),
+              },
+            },
+          }
+        }),
+
+      clearInsight: (trigger) =>
+        set((state) => {
+          const safeTrigger = normalizeInsightTrigger(trigger)
+          return {
+            insightByTrigger: {
+              ...state.insightByTrigger,
+              [safeTrigger]: {
+                loading: false,
+                requestKey: '',
+                log: '',
+                data: null,
+                error: '',
+              },
+            },
+          }
+        }),
 
       trackRecipeSwiped: (recipeName) =>
         set((state) => ({

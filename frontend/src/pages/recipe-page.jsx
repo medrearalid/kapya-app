@@ -1,12 +1,15 @@
 import {
+  CakeSlice,
   Clock3,
   Flame,
   LayoutGrid,
   List,
   LoaderCircle,
+  Soup,
   Search,
   Sparkles,
   Users,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
@@ -48,6 +51,13 @@ const PREFERENCE_OPTIONS = [
   },
 ]
 
+const GUIDED_CATEGORY_OPTIONS = [
+  { id: 'ana_yemek', labelKey: 'recipes.guidedCategoryMainDish', icon: UtensilsCrossed },
+  { id: 'corba', labelKey: 'recipes.guidedCategorySoup', icon: Soup },
+  { id: 'tatli', labelKey: 'recipes.guidedCategoryDessert', icon: CakeSlice },
+  { id: 'atistirmalik', labelKey: 'recipes.guidedCategorySnack', icon: Sparkles },
+]
+
 const LOADING_TEXT_KEYS = [
   'recipes.loadingInspectingPantry',
   'recipes.loadingCombiningIngredients',
@@ -55,17 +65,6 @@ const LOADING_TEXT_KEYS = [
 ]
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24
-
-const CATEGORY_EMOJI_MAP = {
-  sebzeler: '🍅',
-  meyveler: '🍎',
-  'et ve tavuk': '🥩',
-  'sut urunleri': '🧀',
-  baharatlar: '🌶️',
-  atistirmaliklar: '🥨',
-  'temel gida': '🍞',
-  diger: '🧺',
-}
 
 const normalizeText = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
 
@@ -92,12 +91,6 @@ const extractWasteSaverRecipe = (recipeData) => {
   }
 
   return null
-}
-
-const getCategoryLabel = (category) => {
-  const normalizedCategory = normalizeText(category)
-  const emoji = CATEGORY_EMOJI_MAP[normalizedCategory] || '🍽️'
-  return `${emoji} ${category}`
 }
 
 const buildCategorizedIngredients = (products) => {
@@ -194,201 +187,130 @@ OptionCard.propTypes = {
   loadingLabel: PropTypes.string,
 }
 
-function FocusIngredientsPanel({
+function GuidedAssistantWizard({
   isOpen,
-  categorizedIngredients,
-  activeCategory,
-  focusedIngredientKeySet,
-  onCategoryChange,
-  onToggleIngredient,
-  onGenerate,
+  step,
+  selectedCategory,
+  selectedIngredient,
+  pantryIngredientOptions,
+  preferences,
+  onSelectCategory,
+  onSelectIngredient,
+  onTogglePreference,
+  onStepBack,
+  onStepNext,
+  onClose,
+  onSubmit,
   isGenerating,
   t,
 }) {
-  const activeGroup =
-    categorizedIngredients.find((group) => group.category === activeCategory) || categorizedIngredients[0]
+  if (!isOpen) {
+    return null
+  }
+
+  const selectedPreferenceSet = new Set(preferences)
 
   return (
     <AnimatePresence>
-      {isOpen ? (
-        <motion.article
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
+      <>
+        <motion.button
+          type="button"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px]"
+          onClick={onClose}
+          aria-label={t('planner.cancelButton')}
+        />
+
+        <motion.dialog
+          open
+          initial={{ opacity: 0, y: 14, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.98 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="glass-panel rounded-3xl border border-kapya-200/70 bg-white/65 p-4 dark:border-kapya-800/55 dark:bg-slate-900/75"
+          className="fixed left-1/2 top-1/2 z-50 w-[min(680px,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/65 bg-white/95 p-4 shadow-soft dark:border-slate-700/65 dark:bg-slate-900/95"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-300">
-            {t('recipes.focusedIngredientsTitle')}
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                {t('recipes.guidedAssistantTitle')}
+              </p>
+              <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                {t(`recipes.guidedStep${step}Title`)}
+              </h3>
+            </div>
+            <TapButton
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              {t('planner.cancelButton')}
+            </TapButton>
+          </div>
 
-          {categorizedIngredients.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              {t('recipes.focusedIngredientsEmpty')}
-            </p>
-          ) : (
-            <>
-              <div className="mt-3 overflow-x-auto pb-1">
-                <div className="inline-flex min-w-full gap-1 rounded-2xl border border-white/65 bg-white/60 p-1 dark:border-slate-700/70 dark:bg-slate-800/70">
-                  {categorizedIngredients.map((group) => {
-                    const isActive = group.category === activeGroup?.category
+          {step === 1 ? (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {GUIDED_CATEGORY_OPTIONS.map((option) => {
+                const Icon = option.icon
+                const isSelected = selectedCategory === option.id
 
+                return (
+                  <TapButton
+                    key={option.id}
+                    type="button"
+                    onClick={() => onSelectCategory(option.id)}
+                    className={[
+                      'inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition',
+                      isSelected
+                        ? 'border-kapya-600 bg-kapya-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-kapya-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                    ].join(' ')}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    {t(option.labelKey)}
+                  </TapButton>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {step === 2 ? (
+            <div className="mt-3">
+              {pantryIngredientOptions.length === 0 ? (
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('recipes.focusedIngredientsEmpty')}
+                </p>
+              ) : (
+                <div className="flex max-h-[240px] flex-wrap gap-2 overflow-y-auto pr-1">
+                  {pantryIngredientOptions.map((ingredient) => {
+                    const isSelected = selectedIngredient === ingredient
                     return (
-                      <button
-                        key={group.category}
+                      <TapButton
+                        key={ingredient}
                         type="button"
-                        onClick={() => onCategoryChange(group.category)}
-                        className="relative rounded-xl px-3 py-2 text-xs font-semibold"
+                        onClick={() => onSelectIngredient(ingredient)}
+                        className={[
+                          'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                          isSelected
+                            ? 'border-kapya-600 bg-kapya-600 text-white'
+                            : 'border-white/70 bg-white/80 text-slate-700 hover:border-kapya-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                        ].join(' ')}
                       >
-                        {isActive ? (
-                          <motion.div
-                            layoutId="activeTabIndicator"
-                            className="absolute inset-0 rounded-xl bg-kapya-600/15 ring-1 ring-kapya-300 dark:bg-kapya-500/20 dark:ring-kapya-700"
-                            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                          />
-                        ) : null}
-
-                        <span
-                          className={[
-                            'relative z-10 whitespace-nowrap transition',
-                            isActive
-                              ? 'text-kapya-800 dark:text-kapya-200'
-                              : 'text-slate-600 dark:text-slate-300',
-                          ].join(' ')}
-                        >
-                          {getCategoryLabel(group.category)}
-                        </span>
-                      </button>
+                        {ingredient}
+                      </TapButton>
                     )
                   })}
                 </div>
-              </div>
-
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeGroup?.category || 'empty-category'}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                  className="mt-3"
-                >
-                  {activeGroup?.ingredients?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {activeGroup.ingredients.map((ingredient) => {
-                        const isSelected = focusedIngredientKeySet.has(normalizeText(ingredient))
-
-                        return (
-                          <motion.button
-                            key={`${activeGroup.category}-${ingredient}`}
-                            whileTap={{ scale: 0.96 }}
-                            type="button"
-                            onClick={() => onToggleIngredient(ingredient)}
-                            className={[
-                              'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
-                              isSelected
-                                ? 'border-kapya-600 bg-kapya-600 text-white'
-                                : 'border-white/70 bg-white/80 text-slate-700 hover:border-kapya-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
-                            ].join(' ')}
-                          >
-                            {ingredient}
-                          </motion.button>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                      {t('recipes.focusedIngredientsEmpty')}
-                    </p>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-
-              <TapButton
-                type="button"
-                onClick={onGenerate}
-                disabled={isGenerating}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-kapya-600 px-4 py-3 text-sm font-semibold text-white hover:bg-kapya-700 disabled:opacity-85"
-              >
-                {isGenerating ? (
-                  <DotLottieReact
-                    src={COOKING_LOTTIE_SRC}
-                    loop
-                    autoplay
-                    className="h-14 w-14 bg-transparent"
-                    aria-label={t('recipes.loadingFinalizing')}
-                  />
-                ) : (
-                  t('recipes.generateWithSelectionsButton')
-                )}
-              </TapButton>
-            </>
-          )}
-        </motion.article>
-      ) : null}
-    </AnimatePresence>
-  )
-}
-
-FocusIngredientsPanel.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  categorizedIngredients: PropTypes.arrayOf(
-    PropTypes.shape({
-      category: PropTypes.string.isRequired,
-      ingredients: PropTypes.arrayOf(PropTypes.string).isRequired,
-    }),
-  ).isRequired,
-  activeCategory: PropTypes.string,
-  focusedIngredientKeySet: PropTypes.instanceOf(Set).isRequired,
-  onCategoryChange: PropTypes.func.isRequired,
-  onToggleIngredient: PropTypes.func.isRequired,
-  onGenerate: PropTypes.func.isRequired,
-  isGenerating: PropTypes.bool.isRequired,
-  t: PropTypes.func.isRequired,
-}
-
-function PreferenceDrawer({ isOpen, preferences, onTogglePreference, onClose, onGenerate, isGenerating, t }) {
-  const selectedPreferenceSet = useMemo(() => new Set(preferences), [preferences])
-
-  return (
-    <AnimatePresence>
-      {isOpen ? (
-        <>
-          <motion.button
-            type="button"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[1px]"
-            onClick={onClose}
-            aria-label={t('planner.cancelButton')}
-          />
-
-          <motion.aside
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-            className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl rounded-t-3xl border border-white/60 bg-white/90 p-4 pb-6 shadow-soft backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/92"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {t('recipes.filterDrawerTitle')}
-              </h3>
-              <TapButton
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {t('planner.cancelButton')}
-              </TapButton>
+              )}
             </div>
+          ) : null}
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {step === 3 ? (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {PREFERENCE_OPTIONS.map((option) => {
                 const Icon = option.icon
                 const isSelected = selectedPreferenceSet.has(option.id)
-
                 return (
                   <TapButton
                     key={option.id}
@@ -407,40 +329,46 @@ function PreferenceDrawer({ isOpen, preferences, onTogglePreference, onClose, on
                 )
               })}
             </div>
+          ) : null}
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <TapButton
+              type="button"
+              onClick={onStepBack}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            >
+              {step === 1 ? t('planner.cancelButton') : t('recipes.guidedBackButton')}
+            </TapButton>
 
             <TapButton
               type="button"
-              onClick={onGenerate}
+              onClick={step === 3 ? onSubmit : onStepNext}
               disabled={isGenerating}
-              className="mt-3 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white dark:bg-kapya-700"
+              className="rounded-xl bg-kapya-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
             >
-              {isGenerating ? (
-                <span className="flex justify-center">
-                  <DotLottieReact
-                    src={COOKING_LOTTIE_SRC}
-                    loop
-                    autoplay
-                    className="h-14 w-14 bg-transparent"
-                    aria-label={t('recipes.loadingFinalizing')}
-                  />
-                </span>
-              ) : (
-                t('recipes.generateWithSelectionsButton')
-              )}
+              {step === 3 ? t('recipes.guidedCreateButton') : t('recipes.guidedNextButton')}
             </TapButton>
-          </motion.aside>
-        </>
-      ) : null}
+          </div>
+        </motion.dialog>
+      </>
     </AnimatePresence>
   )
 }
 
-PreferenceDrawer.propTypes = {
+GuidedAssistantWizard.propTypes = {
   isOpen: PropTypes.bool.isRequired,
+  step: PropTypes.oneOf([1, 2, 3]).isRequired,
+  selectedCategory: PropTypes.string,
+  selectedIngredient: PropTypes.string,
+  pantryIngredientOptions: PropTypes.arrayOf(PropTypes.string).isRequired,
   preferences: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onSelectCategory: PropTypes.func.isRequired,
+  onSelectIngredient: PropTypes.func.isRequired,
   onTogglePreference: PropTypes.func.isRequired,
+  onStepBack: PropTypes.func.isRequired,
+  onStepNext: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
-  onGenerate: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
   isGenerating: PropTypes.bool.isRequired,
   t: PropTypes.func.isRequired,
 }
@@ -527,7 +455,7 @@ function RecipeLibrarySection({ recipeList, viewMode, setViewMode, onSelectRecip
     )
   } else if (isGridMode) {
     libraryContent = (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {recipeList.map((recipe) => (
           <TapButton
             key={recipe.id}
@@ -696,15 +624,15 @@ function RecipePage() {
   const showToast = usePantryStore((state) => state.showToast)
   const savedRecipes = useRecipeStore((state) => state.savedRecipes)
   const saveRecipe = useRecipeStore((state) => state.saveRecipe)
-  const imageCacheByRecipeName = useRecipeStore((state) => state.imageCacheByRecipeName)
 
   const [queryText, setQueryText] = useState('')
   const [viewMode, setViewMode] = useState(VIEW_MODES.GRID)
   const [focusedIngredients, setFocusedIngredients] = useState([])
-  const [focusedCategory, setFocusedCategory] = useState('')
   const [preferences, setPreferences] = useState([])
-  const [isFocusedIngredientsOpen, setIsFocusedIngredientsOpen] = useState(false)
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+  const [guidedCategory, setGuidedCategory] = useState('')
+  const [guidedIngredient, setGuidedIngredient] = useState('')
+  const [guidedStep, setGuidedStep] = useState(1)
+  const [isGuidedWizardOpen, setIsGuidedWizardOpen] = useState(false)
   const [requestError, setRequestError] = useState('')
   const [refreshError, setRefreshError] = useState('')
   const [isLoadingRecipe, setIsLoadingRecipe] = useState(false)
@@ -713,21 +641,18 @@ function RecipePage() {
   const [loadingSource, setLoadingSource] = useState('')
 
   const loadingTexts = useMemo(() => LOADING_TEXT_KEYS.map((key) => t(key)), [t])
-  const focusedIngredientKeySet = useMemo(
-    () => new Set(focusedIngredients.map((ingredient) => normalizeText(ingredient))),
-    [focusedIngredients],
-  )
   const categorizedIngredients = useMemo(
     () => buildCategorizedIngredients(pantryProducts),
     [pantryProducts],
   )
-  const activeFocusedCategory = useMemo(() => {
-    if (categorizedIngredients.some((group) => group.category === focusedCategory)) {
-      return focusedCategory
-    }
-
-    return categorizedIngredients[0]?.category || ''
-  }, [categorizedIngredients, focusedCategory])
+  const pantryIngredientOptions = useMemo(
+    () =>
+      categorizedIngredients
+        .flatMap((group) => group.ingredients)
+        .filter((name, index, array) => array.findIndex((item) => normalizeText(item) === normalizeText(name)) === index)
+        .sort((left, right) => left.localeCompare(right, 'tr')),
+    [categorizedIngredients],
+  )
   const selectedPreferenceLabels = useMemo(
     () =>
       preferences
@@ -738,6 +663,10 @@ function RecipePage() {
         .filter(Boolean),
     [preferences, t],
   )
+  const selectedGuidedCategoryLabel = useMemo(() => {
+    const option = GUIDED_CATEGORY_OPTIONS.find((item) => item.id === guidedCategory)
+    return option ? t(option.labelKey) : ''
+  }, [guidedCategory, t])
   const featuredRecipe = useMemo(
     () => (Array.isArray(generatedRecipes) ? generatedRecipes[0] || null : null),
     [generatedRecipes],
@@ -758,6 +687,29 @@ function RecipePage() {
         .sort((left, right) => Number(right?.updatedAt || 0) - Number(left?.updatedAt || 0)),
     [savedRecipes],
   )
+  const recentRecipeHints = useMemo(() => {
+    const uniqueMap = new Map()
+
+    for (const name of recentRecipeNames) {
+      const label = String(name ?? '').trim()
+      const key = normalizeText(label)
+      if (!label || !key || uniqueMap.has(key)) {
+        continue
+      }
+      uniqueMap.set(key, label)
+    }
+
+    for (const recipe of recipeList) {
+      const label = String(recipe?.isim ?? '').trim()
+      const key = normalizeText(label)
+      if (!label || !key || uniqueMap.has(key)) {
+        continue
+      }
+      uniqueMap.set(key, label)
+    }
+
+    return Array.from(uniqueMap.values()).slice(0, 20)
+  }, [recentRecipeNames, recipeList])
 
   useEffect(() => {
     if (!isLoadingRecipe) {
@@ -852,19 +804,6 @@ function RecipePage() {
     }
   }
 
-  const toggleFocusedIngredient = (ingredientName) => {
-    setFocusedIngredients((currentIngredients) => {
-      const ingredientKey = normalizeText(ingredientName)
-      const exists = currentIngredients.some((item) => normalizeText(item) === ingredientKey)
-
-      if (exists) {
-        return currentIngredients.filter((item) => normalizeText(item) !== ingredientKey)
-      }
-
-      return [...currentIngredients, ingredientName]
-    })
-  }
-
   const togglePreference = (preferenceId) => {
     setPreferences((currentPreferences) => {
       if (currentPreferences.includes(preferenceId)) {
@@ -875,14 +814,61 @@ function RecipePage() {
     })
   }
 
-  const handleGenerateRecipeByName = async ({ luckyMode = false, source = 'general' } = {}) => {
+  const closeGuidedWizard = () => {
+    setIsGuidedWizardOpen(false)
+    setGuidedStep(1)
+  }
+
+  const handleOpenGuidedWizard = () => {
+    setIsGuidedWizardOpen(true)
+    setGuidedStep(1)
+    setRequestError('')
+  }
+
+  const handleGuidedStepBack = () => {
+    if (guidedStep === 1) {
+      closeGuidedWizard()
+      return
+    }
+
+    setGuidedStep((currentStep) => Math.max(1, currentStep - 1))
+  }
+
+  const handleGuidedStepNext = () => {
+    if (guidedStep === 1 && !guidedCategory) {
+      setRequestError(t('recipes.guidedValidationCategory'))
+      return
+    }
+
+    setRequestError('')
+    setGuidedStep((currentStep) => Math.min(3, currentStep + 1))
+  }
+
+  const handleGenerateRecipeByName = async ({
+    luckyMode = false,
+    source = 'general',
+    overrideFocusedIngredients,
+    overridePreferences,
+    overrideDishCategory,
+  } = {}) => {
     const mealName = String(queryText ?? '').trim()
+    const appliedFocusedIngredients = Array.isArray(overrideFocusedIngredients)
+      ? overrideFocusedIngredients
+      : focusedIngredients
+    const appliedPreferences = Array.isArray(overridePreferences) ? overridePreferences : preferences
+    const appliedDishCategory = String(overrideDishCategory ?? '').trim()
 
     if (isLoadingRecipe) {
       return
     }
 
-    if (!mealName && focusedIngredients.length === 0 && preferences.length === 0 && !luckyMode) {
+    if (
+      !mealName &&
+      appliedFocusedIngredients.length === 0 &&
+      appliedPreferences.length === 0 &&
+      !appliedDishCategory &&
+      !luckyMode
+    ) {
       setRequestError(t('recipes.smartHubValidation'))
       return
     }
@@ -896,10 +882,11 @@ function RecipePage() {
       const generatedRecipe = await generateRecipeByName({
         mealName,
         pantryStock: pantryProducts,
-        focusedIngredients,
-        preferences,
+        focusedIngredients: appliedFocusedIngredients,
+        preferences: appliedPreferences,
+        dishCategory: appliedDishCategory,
         isLucky: luckyMode,
-        imageCacheByRecipeName,
+        recentRecipeNames: recentRecipeHints,
       })
 
       if (!generatedRecipe) {
@@ -935,12 +922,35 @@ function RecipePage() {
     }
   }
 
+  const handleGuidedSubmit = () => {
+    if (!guidedCategory) {
+      setRequestError(t('recipes.guidedValidationCategory'))
+      return
+    }
+
+    const hasGuidedIngredient = pantryIngredientOptions.some(
+      (ingredient) => normalizeText(ingredient) === normalizeText(guidedIngredient),
+    )
+
+    const selectedFocusedIngredients = hasGuidedIngredient && guidedIngredient ? [guidedIngredient] : []
+
+    setFocusedIngredients(selectedFocusedIngredients)
+
+    closeGuidedWizard()
+
+    handleGenerateRecipeByName({
+      source: 'guided-assistant',
+      overrideFocusedIngredients: selectedFocusedIngredients,
+      overridePreferences: preferences,
+      overrideDishCategory: guidedCategory,
+    })
+  }
+
   const isLuckyCardLoading = isLoadingRecipe && loadingSource === 'lucky'
-  const isFocusPanelLoading = isLoadingRecipe && loadingSource === 'focus-panel'
-  const isFilterPanelLoading = isLoadingRecipe && loadingSource === 'filter-panel'
+  const isGuidedCardLoading = isLoadingRecipe && loadingSource === 'guided-assistant'
 
   return (
-    <section className="space-y-4 pb-20">
+    <section className="space-y-4 pb-20 md:pb-6">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sand-700 dark:text-slate-400">
           {t('recipes.badge')}
@@ -1010,28 +1020,24 @@ function RecipePage() {
           </h2>
           <span className="rounded-full bg-kapya-50 px-2.5 py-1 text-[11px] font-semibold text-kapya-800 dark:bg-kapya-900/35 dark:text-kapya-200">
             {t('recipes.selectedBadge', {
-              count: focusedIngredients.length + preferences.length,
+              count:
+                preferences.length +
+                focusedIngredients.length +
+                (guidedCategory ? 1 : 0),
             })}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <OptionCard
-            title={t('recipes.focusIngredientsCardTitle')}
-            description={t('recipes.focusIngredientsCardDescription')}
+            title={t('recipes.guidedAssistantCardTitle')}
+            description={t('recipes.guidedAssistantCardDescription')}
             icon={Search}
-            onClick={() => setIsFocusedIngredientsOpen((current) => !current)}
-            isActive={isFocusedIngredientsOpen || focusedIngredients.length > 0}
+            onClick={handleOpenGuidedWizard}
+            isActive={isGuidedWizardOpen || Boolean(guidedCategory) || focusedIngredients.length > 0}
             disabled={isLoadingRecipe}
-          />
-
-          <OptionCard
-            title={t('recipes.filtersCardTitle')}
-            description={t('recipes.filtersCardDescription')}
-            icon={List}
-            onClick={() => setIsFilterDrawerOpen(true)}
-            isActive={preferences.length > 0}
-            disabled={isLoadingRecipe}
+            loading={isGuidedCardLoading}
+            loadingLabel={loadingTexts[loadingStepIndex]}
           />
 
           <OptionCard
@@ -1046,20 +1052,23 @@ function RecipePage() {
           />
         </div>
 
-        <FocusIngredientsPanel
-          isOpen={isFocusedIngredientsOpen}
-          categorizedIngredients={categorizedIngredients}
-          activeCategory={activeFocusedCategory}
-          focusedIngredientKeySet={focusedIngredientKeySet}
-          onCategoryChange={setFocusedCategory}
-          onToggleIngredient={toggleFocusedIngredient}
-          onGenerate={() => handleGenerateRecipeByName({ source: 'focus-panel' })}
-          isGenerating={isFocusPanelLoading}
-          t={t}
-        />
-
-        {selectedPreferenceLabels.length > 0 ? (
+        {selectedGuidedCategoryLabel || focusedIngredients.length > 0 || selectedPreferenceLabels.length > 0 ? (
           <div className="flex flex-wrap gap-2">
+            {selectedGuidedCategoryLabel ? (
+              <span className="rounded-full border border-kapya-200 bg-kapya-50 px-3 py-1 text-xs font-semibold text-kapya-800 dark:border-kapya-700 dark:bg-kapya-900/30 dark:text-kapya-200">
+                {selectedGuidedCategoryLabel}
+              </span>
+            ) : null}
+
+            {focusedIngredients.map((ingredient) => (
+              <span
+                key={ingredient}
+                className="rounded-full border border-kapya-200 bg-kapya-50 px-3 py-1 text-xs font-semibold text-kapya-800 dark:border-kapya-700 dark:bg-kapya-900/30 dark:text-kapya-200"
+              >
+                {ingredient}
+              </span>
+            ))}
+
             {selectedPreferenceLabels.map((label) => (
               <span
                 key={label}
@@ -1084,13 +1093,21 @@ function RecipePage() {
         t={t}
       />
 
-      <PreferenceDrawer
-        isOpen={isFilterDrawerOpen}
+      <GuidedAssistantWizard
+        isOpen={isGuidedWizardOpen}
+        step={guidedStep}
+        selectedCategory={guidedCategory}
+        selectedIngredient={guidedIngredient}
+        pantryIngredientOptions={pantryIngredientOptions}
         preferences={preferences}
+        onSelectCategory={setGuidedCategory}
+        onSelectIngredient={setGuidedIngredient}
         onTogglePreference={togglePreference}
-        onGenerate={() => handleGenerateRecipeByName({ source: 'filter-panel' })}
-        isGenerating={isFilterPanelLoading}
-        onClose={() => setIsFilterDrawerOpen(false)}
+        onStepBack={handleGuidedStepBack}
+        onStepNext={handleGuidedStepNext}
+        onClose={closeGuidedWizard}
+        onSubmit={handleGuidedSubmit}
+        isGenerating={isGuidedCardLoading}
         t={t}
       />
     </section>

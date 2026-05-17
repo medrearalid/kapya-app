@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
 import { Wallet } from 'lucide-react'
 import PropTypes from 'prop-types'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import CookingLoader from './cooking-loader'
 import { streamInsight } from '../services/insights-api'
 import { useBehaviorStore } from '../store/behavior-store'
+
+const INSIGHT_TRIGGER = 'wallet_page'
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('tr-TR', {
@@ -31,31 +33,49 @@ FinanceStat.propTypes = {
 }
 
 function FinanceInsightCard({ pantryProducts, financeData }) {
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [agentLog, setAgentLog] = useState('')
   const buildUserContext = useBehaviorStore((s) => s.buildUserContext)
+  const insightState = useBehaviorStore((s) => s.insightByTrigger?.[INSIGHT_TRIGGER])
+  const beginInsightStream = useBehaviorStore((s) => s.beginInsightStream)
+  const setInsightLog = useBehaviorStore((s) => s.setInsightLog)
+  const setInsightData = useBehaviorStore((s) => s.setInsightData)
+  const setInsightError = useBehaviorStore((s) => s.setInsightError)
+
+  const requestPayload = useMemo(
+    () => ({
+      trigger: INSIGHT_TRIGGER,
+      pantryProducts,
+      financeData,
+      userContext: buildUserContext(),
+    }),
+    [pantryProducts, financeData, buildUserContext],
+  )
+  const requestKey = useMemo(() => JSON.stringify(requestPayload), [requestPayload])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setAgentLog('')
+    const snapshot = useBehaviorStore.getState().insightByTrigger?.[INSIGHT_TRIGGER]
+    if (
+      snapshot?.requestKey === requestKey &&
+      (snapshot.loading || snapshot.data || snapshot.error)
+    ) {
+      return
+    }
 
-    streamInsight(
-      { trigger: 'wallet_page', pantryProducts, financeData, userContext: buildUserContext() },
-      (msg) => { if (!cancelled) setAgentLog(msg) },
-    )
-      .then((data) => { if (!cancelled) setSummary(data) })
-      .catch(() => { if (!cancelled) setSummary(null) })
-      .finally(() => { if (!cancelled) { setLoading(false); setAgentLog('') } })
+    beginInsightStream(INSIGHT_TRIGGER, requestKey)
 
-    return () => { cancelled = true }
-  }, [pantryProducts, financeData, buildUserContext])
+    streamInsight(requestPayload, (message) => setInsightLog(INSIGHT_TRIGGER, message))
+      .then((data) => {
+        setInsightData(INSIGHT_TRIGGER, data, requestKey)
+      })
+      .catch((error) => {
+        setInsightError(INSIGHT_TRIGGER, error?.message || 'Insight streami alinamadi.', requestKey)
+      })
+  }, [requestPayload, requestKey, beginInsightStream, setInsightLog, setInsightData, setInsightError])
 
-  if (loading) {
+  const summary = insightState?.data
+  if (insightState?.loading) {
     return (
       <div className="flex justify-center rounded-2xl border border-kapya-200/60 bg-kapya-50/60 py-5 dark:border-kapya-800/40 dark:bg-kapya-950/20">
-        <CookingLoader log={agentLog} />
+        <CookingLoader log={insightState?.log || ''} />
       </div>
     )
   }

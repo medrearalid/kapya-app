@@ -28,6 +28,30 @@ const CATEGORY_PILLS = [
 
 const roundToTwo = (value) => Number(value.toFixed(2))
 
+const toSanitizedFloat = (value) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : Number.NaN
+  }
+
+  const normalized = String(value ?? '')
+    .trim()
+    .replaceAll(/\s+/g, '')
+    .replaceAll(',', '.')
+    .replaceAll(/[^\d.-]/g, '')
+
+  if (!normalized || normalized === '-' || normalized === '.' || normalized === '-.') {
+    return Number.NaN
+  }
+
+  const parsed = Number(normalized)
+  if (Number.isFinite(parsed)) {
+    return parsed
+  }
+
+  const fallback = Number.parseFloat(normalized)
+  return Number.isFinite(fallback) ? fallback : Number.NaN
+}
+
 const createDraftReceiptId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -235,19 +259,18 @@ function PantryPage() {
     const normalizedItems = pendingReceiptItems
       .map((item) => {
         const name = String(item?.name ?? '').trim()
-        const quantity = Number(item?.quantity)
-        const price = Number(item?.price)
+        const quantity = toSanitizedFloat(item?.quantity)
+        const price = toSanitizedFloat(item?.price)
         const shelfLifeDays = Number(item?.estimatedShelfLifeDays)
         if (!name || !Number.isFinite(quantity) || quantity <= 0) return null
 
+        const safeQuantity = Number(quantity.toFixed(2))
+        const safePrice = Number.isFinite(price) && price > 0 ? Number(price.toFixed(2)) : 0
+
         return {
           name,
-          quantity,
-          price: Number.isFinite(price) && price > 0 ? Number(price.toFixed(2)) : 0,
-          unitCost:
-            Number.isFinite(price) && price > 0
-              ? Number((price / quantity).toFixed(4))
-              : 0,
+          quantity: safeQuantity,
+          price: safePrice,
           unit: RECEIPT_UNIT_OPTIONS.includes(item?.unit) ? item.unit : 'adet',
           estimatedShelfLifeDays:
             Number.isFinite(shelfLifeDays) && shelfLifeDays > 0 ? Math.round(shelfLifeDays) : 7,
@@ -424,7 +447,7 @@ function PantryPage() {
             <AnimatePresence mode="wait">
               <motion.ul
                 key={selectedCategory}
-                className="grid grid-cols-2 gap-3"
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}

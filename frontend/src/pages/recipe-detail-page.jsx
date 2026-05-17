@@ -112,7 +112,7 @@ function RecipeDetailPage() {
       initial={hasSmartChefEntryAnimation ? { opacity: 0, y: 18, scale: 0.985 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.32, ease: 'easeOut' }}
-      className="space-y-4 pb-32"
+      className="space-y-4 pb-32 md:pb-8"
     >
       <div className="relative overflow-hidden rounded-3xl border border-white/55 bg-white/60 dark:border-slate-700/55 dark:bg-slate-900/60">
         <img
@@ -274,8 +274,8 @@ function RecipeDetailPage() {
         </ul>
       </article>
 
-      <div className="fixed inset-x-0 bottom-20 z-40 px-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-3xl gap-2 rounded-2xl border border-white/55 bg-white/88 p-2 shadow-soft backdrop-blur dark:border-slate-700/55 dark:bg-slate-900/85">
+      <div className="fixed inset-x-0 bottom-20 z-40 px-4 sm:px-6 md:static md:inset-auto md:z-auto md:px-0">
+        <div className="mx-auto flex w-full max-w-3xl gap-2 rounded-2xl border border-white/55 bg-white/88 p-2 shadow-soft backdrop-blur dark:border-slate-700/55 dark:bg-slate-900/85 md:mt-2 md:max-w-none">
           <TapButton
             type="button"
             onClick={openPlanSheet}

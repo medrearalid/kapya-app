@@ -52,7 +52,8 @@ export const postGenerateRecipeByName = async (request, response, next) => {
     const preferences = request.body?.preferences
     const isLucky = request.body?.isLucky === true
     const mealType = String(request.body?.mealType ?? '').trim().toLowerCase()
-    const imageCacheByRecipeName = request.body?.imageCacheByRecipeName
+    const dishCategory = String(request.body?.dishCategory ?? '').trim().toLowerCase()
+    const recentRecipeNames = request.body?.recentRecipeNames
 
     if (pantryStock !== undefined && !Array.isArray(pantryStock)) {
       return response.status(400).json({
@@ -75,6 +76,13 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       })
     }
 
+    if (recentRecipeNames !== undefined && !Array.isArray(recentRecipeNames)) {
+      return response.status(400).json({
+        success: false,
+        error: 'Gecersiz istek govdesi. recentRecipeNames alani dizi olmalidir.',
+      })
+    }
+
     if (mealType && !['kahvalti', 'ogle', 'aksam'].includes(mealType)) {
       return response.status(400).json({
         success: false,
@@ -83,12 +91,13 @@ export const postGenerateRecipeByName = async (request, response, next) => {
     }
 
     if (
-      imageCacheByRecipeName !== undefined &&
-      (imageCacheByRecipeName === null || typeof imageCacheByRecipeName !== 'object')
+      dishCategory &&
+      !['ana_yemek', 'corba', 'tatli', 'atistirmalik'].includes(dishCategory)
     ) {
       return response.status(400).json({
         success: false,
-        error: 'Gecersiz istek govdesi. imageCacheByRecipeName alani obje olmalidir.',
+        error:
+          'Gecersiz istek govdesi. dishCategory alani ana_yemek, corba, tatli veya atistirmalik olmalidir.',
       })
     }
 
@@ -114,7 +123,8 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       preferences,
       isLucky,
       mealType,
-      imageCacheByRecipeName,
+      dishCategory,
+      recentRecipeNames,
     })
 
     return response.status(200).json({

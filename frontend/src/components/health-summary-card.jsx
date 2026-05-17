@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
 import { Activity } from 'lucide-react'
 import PropTypes from 'prop-types'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import CookingLoader from './cooking-loader'
 import { streamInsight } from '../services/insights-api'
 import { useBehaviorStore } from '../store/behavior-store'
+
+const INSIGHT_TRIGGER = 'planner_page'
 
 function StatPill({ label, value, unit }) {
   return (
@@ -27,31 +29,48 @@ StatPill.propTypes = {
 }
 
 function HealthSummaryCard({ plannedMeals }) {
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [agentLog, setAgentLog] = useState('')
   const buildUserContext = useBehaviorStore((s) => s.buildUserContext)
+  const insightState = useBehaviorStore((s) => s.insightByTrigger?.[INSIGHT_TRIGGER])
+  const beginInsightStream = useBehaviorStore((s) => s.beginInsightStream)
+  const setInsightLog = useBehaviorStore((s) => s.setInsightLog)
+  const setInsightData = useBehaviorStore((s) => s.setInsightData)
+  const setInsightError = useBehaviorStore((s) => s.setInsightError)
+
+  const requestPayload = useMemo(
+    () => ({
+      trigger: INSIGHT_TRIGGER,
+      plannedMeals,
+      userContext: buildUserContext(),
+    }),
+    [plannedMeals, buildUserContext],
+  )
+  const requestKey = useMemo(() => JSON.stringify(requestPayload), [requestPayload])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setAgentLog('')
+    const snapshot = useBehaviorStore.getState().insightByTrigger?.[INSIGHT_TRIGGER]
+    if (
+      snapshot?.requestKey === requestKey &&
+      (snapshot.loading || snapshot.data || snapshot.error)
+    ) {
+      return
+    }
 
-    streamInsight(
-      { trigger: 'planner_page', plannedMeals, userContext: buildUserContext() },
-      (msg) => { if (!cancelled) setAgentLog(msg) },
-    )
-      .then((data) => { if (!cancelled) setSummary(data) })
-      .catch(() => { if (!cancelled) setSummary(null) })
-      .finally(() => { if (!cancelled) { setLoading(false); setAgentLog('') } })
+    beginInsightStream(INSIGHT_TRIGGER, requestKey)
 
-    return () => { cancelled = true }
-  }, [plannedMeals, buildUserContext])
+    streamInsight(requestPayload, (message) => setInsightLog(INSIGHT_TRIGGER, message))
+      .then((data) => {
+        setInsightData(INSIGHT_TRIGGER, data, requestKey)
+      })
+      .catch((error) => {
+        setInsightError(INSIGHT_TRIGGER, error?.message || 'Insight streami alinamadi.', requestKey)
+      })
+  }, [requestPayload, requestKey, beginInsightStream, setInsightLog, setInsightData, setInsightError])
 
-  if (loading) {
+  const summary = insightState?.data
+  if (insightState?.loading) {
     return (
       <div className="flex justify-center rounded-2xl border border-emerald-200/60 bg-emerald-50/60 py-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-        <CookingLoader log={agentLog} />
+        <CookingLoader log={insightState?.log || ''} />
       </div>
     )
   }

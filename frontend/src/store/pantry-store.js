@@ -65,13 +65,41 @@ const daysFromNow = (days) => {
   return targetDate.toISOString().slice(0, 10)
 }
 
+const toSanitizedNumber = (value) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : Number.NaN
+  }
+
+  const raw = String(value ?? '').trim()
+  if (!raw) {
+    return Number.NaN
+  }
+
+  const normalized = raw
+    .replaceAll(/\s+/g, '')
+    .replaceAll(',', '.')
+    .replaceAll(/[^\d.-]/g, '')
+
+  if (!normalized || normalized === '-' || normalized === '.' || normalized === '-.') {
+    return Number.NaN
+  }
+
+  const parsed = Number(normalized)
+  if (Number.isFinite(parsed)) {
+    return parsed
+  }
+
+  const fallbackParsed = Number.parseFloat(normalized)
+  return Number.isFinite(fallbackParsed) ? fallbackParsed : Number.NaN
+}
+
 const toPositiveNumber = (value, fallbackValue = 1) => {
-  const parsed = Number(value)
+  const parsed = toSanitizedNumber(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackValue
 }
 
 const toCurrencyNumber = (value, fallbackValue = 0) => {
-  const parsed = Number(value)
+  const parsed = toSanitizedNumber(value)
   if (!Number.isFinite(parsed) || parsed < 0) {
     return fallbackValue
   }
@@ -79,12 +107,36 @@ const toCurrencyNumber = (value, fallbackValue = 0) => {
   return Number(parsed.toFixed(2))
 }
 
+const toUnitCostNumber = (value, fallbackValue = 0) => {
+  const parsed = toSanitizedNumber(value)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallbackValue
+  }
+
+  return Number(parsed.toFixed(4))
+}
+
+const deriveUnitCost = (totalPrice, totalQuantity) => {
+  const safePrice = toCurrencyNumber(totalPrice, 0)
+  const safeQuantity = toPositiveNumber(totalQuantity, 0)
+
+  if (safePrice <= 0 || safeQuantity <= 0) {
+    return 0
+  }
+
+  try {
+    return toUnitCostNumber(safePrice / safeQuantity, 0)
+  } catch {
+    return 0
+  }
+}
+
 const getCurrentMonthKey = () => new Date().toISOString().slice(0, 7)
 
 const increaseMonthlyAmount = (monthMap, monthKey, amount) => ({
   ...(monthMap && typeof monthMap === 'object' ? monthMap : {}),
   [monthKey]: toCurrencyNumber(
-    Number(monthMap?.[monthKey] || 0) + Math.max(0, Number(amount) || 0),
+    Number(monthMap?.[monthKey] || 0) + Math.max(0, toSanitizedNumber(amount) || 0),
     0,
   ),
 })
@@ -232,8 +284,8 @@ const mergeIncomingProduct = (products, incomingProduct) => {
   const existingProduct = nextProducts[existingIndex]
   const existingQuantity = toPositiveNumber(existingProduct.quantity, 0)
   const incomingQuantity = toPositiveNumber(incomingProduct.quantity, 0)
-  const existingUnitCost = toCurrencyNumber(existingProduct?.birimMaliyet, 0)
-  const incomingUnitCost = toCurrencyNumber(incomingProduct?.birimMaliyet, 0)
+  const existingUnitCost = toUnitCostNumber(existingProduct?.birimMaliyet, 0)
+  const incomingUnitCost = toUnitCostNumber(incomingProduct?.birimMaliyet, 0)
 
   let resolvedIncomingUnitCost = Math.max(0, incomingUnitCost)
   if (resolvedIncomingUnitCost <= 0 && existingUnitCost > 0) {
@@ -255,7 +307,7 @@ const mergeIncomingProduct = (products, incomingProduct) => {
     ).toFixed(2),
   )
   const mergedStockValue = toCurrencyNumber(existingStockValue + incomingStockValue, 0)
-  const mergedUnitCost = mergedQuantity > 0 ? toCurrencyNumber(mergedStockValue / mergedQuantity, 0) : 0
+  const mergedUnitCost = deriveUnitCost(mergedStockValue, mergedQuantity)
 
   nextProducts[existingIndex] = {
     ...existingProduct,
@@ -310,7 +362,7 @@ const normalizeProductStatus = (status, quantity) => {
 const normalizeStoredProduct = (product) => {
   const quantity = Number(product?.quantity)
   const normalizedQuantity = Number.isFinite(quantity) ? Number(quantity.toFixed(2)) : 0
-  const birimMaliyet = toCurrencyNumber(product?.birimMaliyet, 0)
+  const birimMaliyet = toUnitCostNumber(product?.birimMaliyet, 0)
   const fiyat = toCurrencyNumber(
     product?.fiyat,
     birimMaliyet > 0 ? birimMaliyet * Math.max(0, normalizedQuantity) : 0,
@@ -322,6 +374,22 @@ const normalizeStoredProduct = (product) => {
     status: normalizeProductStatus(product?.status, normalizedQuantity),
     birimMaliyet,
     fiyat,
+  }
+}
+
+const normalizeGeneratedRecipeSnapshot = (recipe) => {
+  if (!recipe || typeof recipe !== 'object') {
+    return null
+  }
+
+  const goruntuUrl = String(
+    recipe?.goruntuUrl ?? recipe?.nanoBananaGorseli ?? recipe?.imageUrl ?? '',
+  ).trim()
+
+  return {
+    ...recipe,
+    goruntuUrl,
+    nanoBananaGorseli: goruntuUrl,
   }
 }
 
@@ -451,8 +519,7 @@ export const usePantryStore = create(
         return state
       }
 
-      const parsedQuantity = Number(productInput?.quantity)
-      const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1
+      const quantity = Number(toPositiveNumber(productInput?.quantity, 1).toFixed(2))
       const unit = normalizeUnit(productInput?.unit ?? 'adet')
       const kategori = KATEGORI_OPTIONS.includes(productInput?.kategori)
         ? productInput.kategori
@@ -463,13 +530,15 @@ export const usePantryStore = create(
       )
       const estimatedShelfLifeEndDate =
         String(productInput?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(rafOmruGun)
+      const fiyat = toCurrencyNumber(productInput?.fiyat ?? productInput?.price, 0)
+      const birimMaliyet = deriveUnitCost(fiyat, quantity)
 
       const incomingProduct = {
         name,
         quantity,
         unit,
-        fiyat: toCurrencyNumber(productInput?.fiyat ?? productInput?.price, 0),
-        birimMaliyet: toCurrencyNumber(productInput?.birimMaliyet ?? productInput?.unitCost, 0),
+        fiyat,
+        birimMaliyet,
         estimatedShelfLifeEndDate,
         kategori,
         rafOmruGun,
@@ -489,7 +558,7 @@ export const usePantryStore = create(
             return null
           }
 
-          const quantity = toPositiveNumber(item?.quantity, 1)
+          const quantity = Number(toPositiveNumber(item?.quantity, 1).toFixed(2))
           const unit = normalizeUnit(item?.unit ?? 'adet')
           const kategori = KATEGORI_OPTIONS.includes(item?.kategori) ? item.kategori : 'Diğer'
           const rafOmruGun = resolveShelfLifeDays(
@@ -499,9 +568,7 @@ export const usePantryStore = create(
           const estimatedShelfLifeEndDate =
             String(item?.estimatedShelfLifeEndDate ?? '').trim() || daysFromNow(rafOmruGun)
           const fiyat = toCurrencyNumber(item?.fiyat ?? item?.price, 0)
-          const birimMaliyet =
-            toCurrencyNumber(item?.birimMaliyet ?? item?.unitCost, 0) ||
-            (quantity > 0 && fiyat > 0 ? toCurrencyNumber(fiyat / quantity, 0) : 0)
+          const birimMaliyet = deriveUnitCost(fiyat, quantity)
 
           return {
             name,
@@ -546,7 +613,9 @@ export const usePantryStore = create(
 
   setGeneratedRecipes: (recipes) =>
     set({
-      generatedRecipes: Array.isArray(recipes) ? recipes : [],
+      generatedRecipes: (Array.isArray(recipes) ? recipes : [])
+        .map(normalizeGeneratedRecipeSnapshot)
+        .filter(Boolean),
     }),
 
   addRecentRecipeNames: (recipeNames) =>
@@ -622,8 +691,8 @@ export const usePantryStore = create(
 
         const currentQuantity = Number(product.quantity)
         const unitCost =
-          toCurrencyNumber(product?.birimMaliyet, 0) ||
-          (currentQuantity > 0 ? toCurrencyNumber(Number(product?.fiyat || 0) / currentQuantity, 0) : 0)
+          toUnitCostNumber(product?.birimMaliyet, 0) ||
+          deriveUnitCost(product?.fiyat, currentQuantity)
         const consumedQuantity = Math.min(
           Math.max(0, Number.isFinite(currentQuantity) ? currentQuantity : 0),
           Math.max(0, neededAmount),
@@ -706,7 +775,7 @@ export const usePantryStore = create(
             ? {
                 ...product,
                 quantity: safeQuantity,
-                fiyat: toCurrencyNumber(safeQuantity * toCurrencyNumber(product?.birimMaliyet, 0), 0),
+                fiyat: toCurrencyNumber(safeQuantity * toUnitCostNumber(product?.birimMaliyet, 0), 0),
                 status: safeQuantity > 0 ? PRODUCT_STATUS_ACTIVE : PRODUCT_STATUS_DEPLETED,
                 updatedAt: Date.now(),
               }

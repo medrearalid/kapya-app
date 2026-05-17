@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
 import { CalendarDays, Clock3, Users } from 'lucide-react'
 import TapButton from './tap-button'
+import { useMediaQuery } from '../utils/use-media-query'
 
 function MealPlanSheet({
   isOpen,
@@ -14,13 +15,26 @@ function MealPlanSheet({
   onSubmit,
   labels,
 }) {
+  const isDesktopViewport = useMediaQuery('(min-width: 768px)')
+
   if (!isOpen) {
     return null
   }
 
   return (
-    <dialog open className="fixed inset-0 z-[70] flex items-end bg-black/45 p-3 sm:p-6">
-      <div className="glass-panel mx-auto w-full max-w-xl rounded-2xl border border-white/60 bg-white/95 p-4 shadow-soft dark:border-slate-700/60 dark:bg-slate-900/95">
+    <dialog
+      open
+      className={[
+        'fixed inset-0 z-[70] flex bg-black/45 p-3 sm:p-6',
+        isDesktopViewport ? 'items-center justify-center' : 'items-end',
+      ].join(' ')}
+    >
+      <div
+        className={[
+          'glass-panel mx-auto w-full border border-white/60 bg-white/95 p-4 shadow-soft dark:border-slate-700/60 dark:bg-slate-900/95',
+          isDesktopViewport ? 'max-w-lg rounded-3xl' : 'max-w-xl rounded-2xl',
+        ].join(' ')}
+      >
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
           {labels.title}
         </p>

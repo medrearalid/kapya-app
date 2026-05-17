@@ -16,37 +16,55 @@ const RECEIPT_ALLOWED_UNITS = new Set([
 const RECEIPT_NON_FOOD_KEYWORDS = [
   'bardak',
   'bardagi',
+  'bardağı',
   'tabak',
   'kase',
+  'kâse',
   'kupa',
   'kasik',
+  'kaşık',
   'catal',
+  'çatal',
   'bicak',
+  'bıçak',
   'sunger',
+  'sünger',
   'deterjan',
   'sabun',
   'sampuan',
+  'şampuan',
   'dis macunu',
+  'diş macunu',
   'pecete',
+  'peçete',
   'tuvalet kagidi',
+  'tuvalet kağıdı',
   'cop poseti',
+  'çöp poşeti',
   'kristal tasli',
+  'kristal taşlı',
   'tasli',
+  'taşlı',
 ]
 
 const RECEIPT_READY_TO_EAT_KEYWORDS = [
   'yas pasta',
+  'yaş pasta',
   'pasta',
   'tatli',
+  'tatlı',
   'baklava',
   'kek',
   'kurabiye',
   'sandvic',
+  'sandviç',
   'durum',
+  'dürüm',
   'hamburger',
   'pizza',
   'lahmacun',
   'hazir yemek',
+  'hazır yemek',
 ]
 
 const recipeResponseJsonSchema = {
@@ -133,6 +151,7 @@ const buildPrompt = ({ budgetProfile, pantryStock, urgentProducts }) => {
     '6) baseAmount degeri her malzeme icin kesinlikle 1 KISILIK standart miktar olmalidir.',
     '7) baseAmount degeri pozitif bir sayi olmalidir (ornek: 100 gram, 1 adet, 0.25 litre).',
     '8) JSON semasi disinda hicbir metin, markdown veya aciklama dondurme.',
+    '9) Output Formatting: JSON payloadi icindeki tum metin degerleri (keyler haric) UTF-8 Turkce karakter seti ile yazilmalidir. Karakter standardizasyonu yapma.',
     '',
     `Girdi verisi: ${JSON.stringify(payload)}`,
   ].join('\n')
@@ -228,12 +247,6 @@ const parseReceiptJsonResponse = (rawText) => {
     String(value ?? '')
       .trim()
       .toLocaleLowerCase('tr-TR')
-      .replaceAll('ç', 'c')
-      .replaceAll('ğ', 'g')
-      .replaceAll('ı', 'i')
-      .replaceAll('ö', 'o')
-      .replaceAll('ş', 's')
-      .replaceAll('ü', 'u')
 
   const normalizeReceiptUnit = (value) => {
     const normalizedUnit = normalizeReceiptText(value)
@@ -263,6 +276,30 @@ const parseReceiptJsonResponse = (rawText) => {
     return ''
   }
 
+  const parseReceiptNumber = (value) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : Number.NaN
+    }
+
+    const normalized = String(value ?? '')
+      .trim()
+      .replaceAll(/\s+/g, '')
+      .replaceAll(',', '.')
+      .replaceAll(/[^\d.-]/g, '')
+
+    if (!normalized || normalized === '-' || normalized === '.' || normalized === '-.') {
+      return Number.NaN
+    }
+
+    const parsed = Number(normalized)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+
+    const fallback = Number.parseFloat(normalized)
+    return Number.isFinite(fallback) ? fallback : Number.NaN
+  }
+
   const hasAnyKeyword = (name, keywordList) =>
     keywordList.some((keyword) => name.includes(keyword))
 
@@ -280,10 +317,10 @@ const parseReceiptJsonResponse = (rawText) => {
   const normalizedItems = parsed
     .map((item) => ({
       name: String(item?.name ?? item?.isim ?? '').trim(),
-      quantity: Number(item?.quantity ?? item?.miktar ?? 0),
+      quantity: parseReceiptNumber(item?.quantity ?? item?.miktar ?? 0),
       unit: normalizeReceiptUnit(item?.unit ?? item?.birim),
-      price: Number(item?.price ?? item?.fiyat ?? 0),
-      estimatedShelfLifeDays: Number(
+      price: parseReceiptNumber(item?.price ?? item?.fiyat ?? 0),
+      estimatedShelfLifeDays: parseReceiptNumber(
         item?.estimatedShelfLifeDays ?? item?.tahminiRafOmruGun ?? 0,
       ),
       kategori: String(item?.kategori ?? '').trim() || 'Diğer',

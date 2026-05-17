@@ -307,6 +307,12 @@ export const useRecipeStore = create(
           ),
         })),
 
+      clearRecipeMemory: () =>
+        set({
+          savedRecipes: [],
+          imageCacheByRecipeName: {},
+        }),
+
       getRecipeById: (recipeId) => {
         const targetId = normalizeText(recipeId)
         if (!targetId) {

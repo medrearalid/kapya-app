@@ -39,7 +39,7 @@ function RootLayout() {
   }, [currentTheme])
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-3xl text-slate-900 dark:text-slate-100 sm:px-5">
+    <div className="min-h-screen w-full text-slate-900 dark:text-slate-100">
       {toastMessage?.message ? (
         <div className="pointer-events-none fixed inset-x-0 top-4 z-[60] flex justify-center px-4">
           <output
@@ -51,25 +51,34 @@ function RootLayout() {
         </div>
       ) : null}
 
-      <div className="glass-panel min-h-screen bg-white/45 sm:my-5 sm:rounded-3xl sm:border sm:border-white/45 sm:shadow-soft dark:bg-slate-900/45 dark:sm:border-slate-700/45">
-        <main className="px-4 pb-24 pt-5 sm:px-8 sm:pb-28 sm:pt-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.28, ease: 'easeOut' }}
-            >
-              {outlet}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+      <div className="mx-auto min-h-screen w-full max-w-[1800px] md:flex md:gap-4 md:px-4 lg:px-6">
+        <aside className="hidden md:block md:w-64 md:py-4">
+          <div className="sticky top-4 h-[calc(100vh-2rem)]">
+            <BottomNavigation variant="sidebar" />
+          </div>
+        </aside>
+
+        <div className="glass-panel min-h-screen flex-1 bg-white/45 md:my-4 md:rounded-3xl md:border md:border-white/45 md:shadow-soft dark:bg-slate-900/45 dark:md:border-slate-700/45">
+          <main className="px-4 pb-24 pt-5 sm:px-6 sm:pt-7 md:px-8 md:pb-8 lg:px-10">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 12 }}
+                transition={{ duration: 0.28, ease: 'easeOut' }}
+              >
+                {outlet}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
       </div>
-      <BottomNavigation />
+
+      <BottomNavigation variant="bottom" />
 
       <AnimatePresence>
-        {!hasCompletedOnboarding ? <OnboardingOverlay /> : null}
+        {hasCompletedOnboarding ? null : <OnboardingOverlay />}
       </AnimatePresence>
     </div>
   )

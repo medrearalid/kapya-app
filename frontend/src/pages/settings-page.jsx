@@ -1,4 +1,4 @@
-import { Globe, MoonStar, RotateCcw, WalletCards } from 'lucide-react'
+import { Globe, MoonStar, RotateCcw, Trash2, WalletCards } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import TapButton from '../components/tap-button'
@@ -7,6 +7,7 @@ import {
   getBudgetProfileLabelKey,
   usePantryStore,
 } from '../store/pantry-store'
+import { useRecipeStore } from '../store/recipe-store'
 
 const LANGUAGE_STORAGE_KEY = 'kapya-language'
 
@@ -17,6 +18,10 @@ function SettingsPage() {
   const currentTheme = usePantryStore((state) => state.currentTheme)
   const setTheme = usePantryStore((state) => state.setTheme)
   const resetAllData = usePantryStore((state) => state.resetAllData)
+  const clearGeneratedRecipes = usePantryStore((state) => state.clearGeneratedRecipes)
+  const clearRecentRecipes = usePantryStore((state) => state.clearRecentRecipes)
+  const showToast = usePantryStore((state) => state.showToast)
+  const clearRecipeMemory = useRecipeStore((state) => state.clearRecipeMemory)
 
   const activeLanguage = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'tr'
 
@@ -27,6 +32,33 @@ function SettingsPage() {
     if (globalThis.window) {
       globalThis.window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage)
     }
+  }
+
+  const confirmAction = (translationKey) => {
+    if (!globalThis.window || typeof globalThis.window.confirm !== 'function') {
+      return true
+    }
+
+    return globalThis.window.confirm(t(translationKey))
+  }
+
+  const handleResetAllData = () => {
+    if (!confirmAction('settings.resetDataConfirm')) {
+      return
+    }
+
+    resetAllData()
+  }
+
+  const handleClearRecipeMemory = () => {
+    if (!confirmAction('settings.clearRecipeMemoryConfirm')) {
+      return
+    }
+
+    clearRecipeMemory()
+    clearGeneratedRecipes()
+    clearRecentRecipes()
+    showToast(t('settings.clearRecipeMemorySuccess'))
   }
 
   return (
@@ -112,9 +144,23 @@ function SettingsPage() {
       </article>
 
       <article className="glass-panel soft-card rounded-2xl p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+          {t('settings.recipeMemoryLabel')}
+        </p>
         <TapButton
           type="button"
-          onClick={resetAllData}
+          onClick={handleClearRecipeMemory}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300/70 bg-amber-100/80 px-4 py-3 text-sm font-semibold text-amber-900 transition hover:bg-amber-200/80 dark:border-amber-700/80 dark:bg-amber-900/25 dark:text-amber-200 dark:hover:bg-amber-900/45"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          {t('settings.clearRecipeMemory')}
+        </TapButton>
+      </article>
+
+      <article className="glass-panel soft-card rounded-2xl p-4">
+        <TapButton
+          type="button"
+          onClick={handleResetAllData}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-kapya-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-kapya-700"
         >
           <RotateCcw className="h-4 w-4" aria-hidden="true" />

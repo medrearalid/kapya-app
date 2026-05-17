@@ -1,5 +1,5 @@
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import PropTypes from 'prop-types'
 
 function GlowDot() {
@@ -22,21 +22,15 @@ function CookingLoader({ log, className = '' }) {
       />
 
       <div className="flex min-h-[1.25rem] items-center">
-        <AnimatePresence mode="wait">
-          {log ? (
-            <motion.p
-              key={log}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="flex items-center text-center text-xs font-light text-slate-400 dark:text-slate-500"
-            >
-              <GlowDot />
-              {log}
-            </motion.p>
-          ) : null}
-        </AnimatePresence>
+        <motion.p
+          initial={false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="flex items-center text-center text-xs font-light text-slate-400 dark:text-slate-500"
+        >
+          <GlowDot />
+          {log || 'Ajan dusunuyor...'}
+        </motion.p>
       </div>
     </div>
   )
