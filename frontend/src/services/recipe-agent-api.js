@@ -2,6 +2,38 @@ const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/
 
 const buildApiUrl = (path) => `${API_BASE_URL}${path}`
 
+const toCleanStringArray = (values, limit = Number.POSITIVE_INFINITY) =>
+  (Array.isArray(values) ? values : [])
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+    .slice(0, limit)
+
+const setArrayFieldIfAny = (payload, key, values) => {
+  if (Array.isArray(values) && values.length > 0) {
+    payload[key] = values
+  }
+}
+
+const setStringFieldIfAny = (payload, key, value) => {
+  const normalized = String(value ?? '').trim()
+  if (normalized) {
+    payload[key] = normalized
+  }
+}
+
+const toGuidedContextPayload = (guidedContext) => {
+  if (!guidedContext || typeof guidedContext !== 'object' || Array.isArray(guidedContext)) {
+    return null
+  }
+
+  return {
+    category: String(guidedContext?.category ?? '').trim(),
+    focusIngredients: toCleanStringArray(guidedContext?.focusIngredients),
+    cookingTechnique: String(guidedContext?.cookingTechnique ?? '').trim(),
+    dietGoal: String(guidedContext?.dietGoal ?? '').trim(),
+  }
+}
+
 export const generateWasteSaverRecipes = async ({
   budgetProfile,
   pantryStock,
@@ -51,6 +83,7 @@ export const generateRecipeByName = async ({
   pantryStock,
   focusedIngredients,
   preferences,
+  guidedContext,
   isLucky,
   mealType,
   recentRecipeNames,
@@ -59,38 +92,26 @@ export const generateRecipeByName = async ({
     mealName: String(mealName ?? '').trim(),
   }
 
-  if (Array.isArray(pantryStock) && pantryStock.length > 0) {
-    payload.pantryStock = pantryStock
+  setArrayFieldIfAny(payload, 'pantryStock', pantryStock)
+  setArrayFieldIfAny(payload, 'focusedIngredients', focusedIngredients)
+  setArrayFieldIfAny(payload, 'preferences', preferences)
+
+  const normalizedGuidedContext = toGuidedContextPayload(guidedContext)
+  if (normalizedGuidedContext) {
+    payload.guidedContext = normalizedGuidedContext
   }
 
-  if (Array.isArray(focusedIngredients) && focusedIngredients.length > 0) {
-    payload.focusedIngredients = focusedIngredients
-  }
-
-  if (Array.isArray(preferences) && preferences.length > 0) {
-    payload.preferences = preferences
-  }
-
-  if (Array.isArray(recentRecipeNames) && recentRecipeNames.length > 0) {
-    payload.recentRecipeNames = recentRecipeNames
-      .map((name) => String(name ?? '').trim())
-      .filter(Boolean)
-      .slice(0, 20)
+  const normalizedRecentRecipeNames = toCleanStringArray(recentRecipeNames, 20)
+  if (normalizedRecentRecipeNames.length > 0) {
+    payload.recentRecipeNames = normalizedRecentRecipeNames
   }
 
   if (isLucky === true) {
     payload.isLucky = true
   }
 
-  const normalizedMealType = String(mealType ?? '').trim()
-  if (normalizedMealType) {
-    payload.mealType = normalizedMealType
-  }
-
-  const normalizedDishCategory = String(dishCategory ?? '').trim()
-  if (normalizedDishCategory) {
-    payload.dishCategory = normalizedDishCategory
-  }
+  setStringFieldIfAny(payload, 'mealType', mealType)
+  setStringFieldIfAny(payload, 'dishCategory', dishCategory)
 
   const response = await fetch(buildApiUrl('/api/ai/recipes/by-name'), {
     method: 'POST',

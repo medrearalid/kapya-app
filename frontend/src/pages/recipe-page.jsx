@@ -33,29 +33,25 @@ const VIEW_MODES = {
   LIST: 'list',
 }
 
-const PREFERENCE_OPTIONS = [
-  {
-    id: 'quick-15',
-    labelKey: 'recipes.filterQuick15',
-    icon: Clock3,
-  },
-  {
-    id: 'high-protein',
-    labelKey: 'recipes.filterHighProtein',
-    icon: Flame,
-  },
-  {
-    id: 'one-pot',
-    labelKey: 'recipes.filterOnePot',
-    icon: List,
-  },
-]
-
 const GUIDED_CATEGORY_OPTIONS = [
   { id: 'ana_yemek', labelKey: 'recipes.guidedCategoryMainDish', icon: UtensilsCrossed },
   { id: 'corba', labelKey: 'recipes.guidedCategorySoup', icon: Soup },
   { id: 'tatli', labelKey: 'recipes.guidedCategoryDessert', icon: CakeSlice },
   { id: 'atistirmalik', labelKey: 'recipes.guidedCategorySnack', icon: Sparkles },
+]
+
+const GUIDED_COOKING_TECHNIQUE_OPTIONS = [
+  { id: 'firin', labelKey: 'recipes.guidedTechniqueOven' },
+  { id: 'tava_ocak', labelKey: 'recipes.guidedTechniquePanStove' },
+  { id: 'tencere', labelKey: 'recipes.guidedTechniquePot' },
+  { id: 'pisirme_gerektirmez', labelKey: 'recipes.guidedTechniqueNoCook' },
+]
+
+const GUIDED_DIET_GOAL_OPTIONS = [
+  { id: 'yuksek_protein', labelKey: 'recipes.guidedDietHighProtein' },
+  { id: 'dusuk_karbonhidrat', labelKey: 'recipes.guidedDietLowCarb' },
+  { id: 'sadece_sebze', labelKey: 'recipes.guidedDietVegetableOnly' },
+  { id: 'fark_etmez', labelKey: 'recipes.guidedDietAny' },
 ]
 
 const LOADING_TEXT_KEYS = [
@@ -67,6 +63,24 @@ const LOADING_TEXT_KEYS = [
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 const normalizeText = (value) => String(value ?? '').trim().toLocaleLowerCase('tr-TR')
+
+const mergeUniqueLabels = (...valueLists) => {
+  const uniqueMap = new Map()
+
+  for (const list of valueLists) {
+    for (const rawValue of Array.isArray(list) ? list : []) {
+      const label = String(rawValue ?? '').trim()
+      const key = normalizeText(label)
+      if (!label || !key || uniqueMap.has(key)) {
+        continue
+      }
+
+      uniqueMap.set(key, label)
+    }
+  }
+
+  return Array.from(uniqueMap.values())
+}
 
 const calculateDaysLeft = (dateValue) => {
   const targetDate = new Date(dateValue)
@@ -191,12 +205,14 @@ function GuidedAssistantWizard({
   isOpen,
   step,
   selectedCategory,
-  selectedIngredient,
+  selectedIngredients,
+  selectedCookingTechnique,
+  selectedDietGoal,
   pantryIngredientOptions,
-  preferences,
   onSelectCategory,
-  onSelectIngredient,
-  onTogglePreference,
+  onToggleIngredient,
+  onSelectCookingTechnique,
+  onSelectDietGoal,
   onStepBack,
   onStepNext,
   onClose,
@@ -208,28 +224,36 @@ function GuidedAssistantWizard({
     return null
   }
 
-  const selectedPreferenceSet = new Set(preferences)
+  const selectedIngredientSet = new Set(
+    (Array.isArray(selectedIngredients) ? selectedIngredients : []).map((ingredient) =>
+      normalizeText(ingredient),
+    ),
+  )
 
   return (
     <AnimatePresence>
-      <>
+      <motion.div
+        key="guided-wizard-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-6"
+      >
         <motion.button
           type="button"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px]"
+          className="absolute inset-0"
           onClick={onClose}
           aria-label={t('planner.cancelButton')}
         />
 
-        <motion.dialog
-          open
+        <motion.div
+          role="dialog"
+          aria-modal="true"
           initial={{ opacity: 0, y: 14, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.98 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed left-1/2 top-1/2 z-50 w-[min(680px,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/65 bg-white/95 p-4 shadow-soft dark:border-slate-700/65 dark:bg-slate-900/95"
+          className="relative z-10 w-full max-w-xl rounded-3xl border border-white/65 bg-white/95 p-4 shadow-soft dark:border-slate-700/65 dark:bg-slate-900/95"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -277,6 +301,10 @@ function GuidedAssistantWizard({
 
           {step === 2 ? (
             <div className="mt-3">
+              <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('recipes.guidedFocusMultiHint')}
+              </p>
+
               {pantryIngredientOptions.length === 0 ? (
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   {t('recipes.focusedIngredientsEmpty')}
@@ -284,12 +312,12 @@ function GuidedAssistantWizard({
               ) : (
                 <div className="flex max-h-[240px] flex-wrap gap-2 overflow-y-auto pr-1">
                   {pantryIngredientOptions.map((ingredient) => {
-                    const isSelected = selectedIngredient === ingredient
+                    const isSelected = selectedIngredientSet.has(normalizeText(ingredient))
                     return (
                       <TapButton
                         key={ingredient}
                         type="button"
-                        onClick={() => onSelectIngredient(ingredient)}
+                        onClick={() => onToggleIngredient(ingredient)}
                         className={[
                           'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
                           isSelected
@@ -307,15 +335,14 @@ function GuidedAssistantWizard({
           ) : null}
 
           {step === 3 ? (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {PREFERENCE_OPTIONS.map((option) => {
-                const Icon = option.icon
-                const isSelected = selectedPreferenceSet.has(option.id)
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {GUIDED_COOKING_TECHNIQUE_OPTIONS.map((option) => {
+                const isSelected = selectedCookingTechnique === option.id
                 return (
                   <TapButton
                     key={option.id}
                     type="button"
-                    onClick={() => onTogglePreference(option.id)}
+                    onClick={() => onSelectCookingTechnique(option.id)}
                     className={[
                       'inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition',
                       isSelected
@@ -323,7 +350,29 @@ function GuidedAssistantWizard({
                         : 'border-slate-200 bg-white text-slate-700 hover:border-kapya-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
                     ].join(' ')}
                   >
-                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    {t(option.labelKey)}
+                  </TapButton>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {step === 4 ? (
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {GUIDED_DIET_GOAL_OPTIONS.map((option) => {
+                const isSelected = selectedDietGoal === option.id
+                return (
+                  <TapButton
+                    key={option.id}
+                    type="button"
+                    onClick={() => onSelectDietGoal(option.id)}
+                    className={[
+                      'inline-flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold transition',
+                      isSelected
+                        ? 'border-kapya-600 bg-kapya-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-kapya-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+                    ].join(' ')}
+                  >
                     {t(option.labelKey)}
                   </TapButton>
                 )
@@ -342,29 +391,31 @@ function GuidedAssistantWizard({
 
             <TapButton
               type="button"
-              onClick={step === 3 ? onSubmit : onStepNext}
+              onClick={step === 4 ? onSubmit : onStepNext}
               disabled={isGenerating}
               className="rounded-xl bg-kapya-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-70"
             >
-              {step === 3 ? t('recipes.guidedCreateButton') : t('recipes.guidedNextButton')}
+              {step === 4 ? t('recipes.guidedCreateButton') : t('recipes.guidedNextButton')}
             </TapButton>
           </div>
-        </motion.dialog>
-      </>
+        </motion.div>
+      </motion.div>
     </AnimatePresence>
   )
 }
 
 GuidedAssistantWizard.propTypes = {
   isOpen: PropTypes.bool.isRequired,
-  step: PropTypes.oneOf([1, 2, 3]).isRequired,
+  step: PropTypes.oneOf([1, 2, 3, 4]).isRequired,
   selectedCategory: PropTypes.string,
-  selectedIngredient: PropTypes.string,
+  selectedIngredients: PropTypes.arrayOf(PropTypes.string),
+  selectedCookingTechnique: PropTypes.string,
+  selectedDietGoal: PropTypes.string,
   pantryIngredientOptions: PropTypes.arrayOf(PropTypes.string).isRequired,
-  preferences: PropTypes.arrayOf(PropTypes.string).isRequired,
   onSelectCategory: PropTypes.func.isRequired,
-  onSelectIngredient: PropTypes.func.isRequired,
-  onTogglePreference: PropTypes.func.isRequired,
+  onToggleIngredient: PropTypes.func.isRequired,
+  onSelectCookingTechnique: PropTypes.func.isRequired,
+  onSelectDietGoal: PropTypes.func.isRequired,
   onStepBack: PropTypes.func.isRequired,
   onStepNext: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
@@ -628,9 +679,10 @@ function RecipePage() {
   const [queryText, setQueryText] = useState('')
   const [viewMode, setViewMode] = useState(VIEW_MODES.GRID)
   const [focusedIngredients, setFocusedIngredients] = useState([])
-  const [preferences, setPreferences] = useState([])
   const [guidedCategory, setGuidedCategory] = useState('')
-  const [guidedIngredient, setGuidedIngredient] = useState('')
+  const [guidedFocusIngredients, setGuidedFocusIngredients] = useState([])
+  const [guidedCookingTechnique, setGuidedCookingTechnique] = useState('')
+  const [guidedDietGoal, setGuidedDietGoal] = useState('')
   const [guidedStep, setGuidedStep] = useState(1)
   const [isGuidedWizardOpen, setIsGuidedWizardOpen] = useState(false)
   const [requestError, setRequestError] = useState('')
@@ -653,20 +705,20 @@ function RecipePage() {
         .sort((left, right) => left.localeCompare(right, 'tr')),
     [categorizedIngredients],
   )
-  const selectedPreferenceLabels = useMemo(
-    () =>
-      preferences
-        .map(
-          (preference) =>
-            t(PREFERENCE_OPTIONS.find((option) => option.id === preference)?.labelKey || ''),
-        )
-        .filter(Boolean),
-    [preferences, t],
-  )
   const selectedGuidedCategoryLabel = useMemo(() => {
     const option = GUIDED_CATEGORY_OPTIONS.find((item) => item.id === guidedCategory)
     return option ? t(option.labelKey) : ''
   }, [guidedCategory, t])
+  const selectedGuidedTechniqueLabel = useMemo(() => {
+    const option = GUIDED_COOKING_TECHNIQUE_OPTIONS.find(
+      (item) => item.id === guidedCookingTechnique,
+    )
+    return option ? t(option.labelKey) : ''
+  }, [guidedCookingTechnique, t])
+  const selectedGuidedDietLabel = useMemo(() => {
+    const option = GUIDED_DIET_GOAL_OPTIONS.find((item) => item.id === guidedDietGoal)
+    return option ? t(option.labelKey) : ''
+  }, [guidedDietGoal, t])
   const featuredRecipe = useMemo(
     () => (Array.isArray(generatedRecipes) ? generatedRecipes[0] || null : null),
     [generatedRecipes],
@@ -804,13 +856,24 @@ function RecipePage() {
     }
   }
 
-  const togglePreference = (preferenceId) => {
-    setPreferences((currentPreferences) => {
-      if (currentPreferences.includes(preferenceId)) {
-        return currentPreferences.filter((item) => item !== preferenceId)
+  const toggleGuidedFocusIngredient = (ingredient) => {
+    const normalizedIngredient = normalizeText(ingredient)
+    if (!normalizedIngredient) {
+      return
+    }
+
+    setGuidedFocusIngredients((currentIngredients) => {
+      const alreadySelected = currentIngredients.some(
+        (item) => normalizeText(item) === normalizedIngredient,
+      )
+
+      if (alreadySelected) {
+        return currentIngredients.filter(
+          (item) => normalizeText(item) !== normalizedIngredient,
+        )
       }
 
-      return [...currentPreferences, preferenceId]
+      return [...currentIngredients, ingredient]
     })
   }
 
@@ -840,23 +903,51 @@ function RecipePage() {
       return
     }
 
+    if (guidedStep === 3 && !guidedCookingTechnique) {
+      setRequestError(t('recipes.guidedValidationTechnique'))
+      return
+    }
+
     setRequestError('')
-    setGuidedStep((currentStep) => Math.min(3, currentStep + 1))
+    setGuidedStep((currentStep) => Math.min(4, currentStep + 1))
   }
 
   const handleGenerateRecipeByName = async ({
     luckyMode = false,
     source = 'general',
     overrideFocusedIngredients,
-    overridePreferences,
     overrideDishCategory,
+    overrideGuidedContext,
   } = {}) => {
     const mealName = String(queryText ?? '').trim()
-    const appliedFocusedIngredients = Array.isArray(overrideFocusedIngredients)
-      ? overrideFocusedIngredients
-      : focusedIngredients
-    const appliedPreferences = Array.isArray(overridePreferences) ? overridePreferences : preferences
-    const appliedDishCategory = String(overrideDishCategory ?? '').trim()
+    const rawGuidedContext =
+      overrideGuidedContext &&
+      typeof overrideGuidedContext === 'object' &&
+      !Array.isArray(overrideGuidedContext)
+        ? overrideGuidedContext
+        : null
+
+    const appliedFocusedIngredients = mergeUniqueLabels(
+      Array.isArray(overrideFocusedIngredients) ? overrideFocusedIngredients : focusedIngredients,
+      rawGuidedContext?.focusIngredients,
+    )
+    const appliedDishCategory = String(
+      overrideDishCategory ?? rawGuidedContext?.category ?? '',
+    ).trim()
+    const appliedGuidedContext = rawGuidedContext
+      ? {
+          category: appliedDishCategory,
+          focusIngredients: appliedFocusedIngredients,
+          cookingTechnique: String(rawGuidedContext?.cookingTechnique ?? '').trim(),
+          dietGoal: String(rawGuidedContext?.dietGoal ?? '').trim(),
+        }
+      : null
+    const hasGuidedContextCriteria =
+      Boolean(appliedGuidedContext?.category) ||
+      (Array.isArray(appliedGuidedContext?.focusIngredients) &&
+        appliedGuidedContext.focusIngredients.length > 0) ||
+      Boolean(appliedGuidedContext?.cookingTechnique) ||
+      Boolean(appliedGuidedContext?.dietGoal)
 
     if (isLoadingRecipe) {
       return
@@ -865,8 +956,8 @@ function RecipePage() {
     if (
       !mealName &&
       appliedFocusedIngredients.length === 0 &&
-      appliedPreferences.length === 0 &&
       !appliedDishCategory &&
+      !hasGuidedContextCriteria &&
       !luckyMode
     ) {
       setRequestError(t('recipes.smartHubValidation'))
@@ -883,10 +974,10 @@ function RecipePage() {
         mealName,
         pantryStock: pantryProducts,
         focusedIngredients: appliedFocusedIngredients,
-        preferences: appliedPreferences,
         dishCategory: appliedDishCategory,
         isLucky: luckyMode,
         recentRecipeNames: recentRecipeHints,
+        guidedContext: appliedGuidedContext,
       })
 
       if (!generatedRecipe) {
@@ -928,21 +1019,40 @@ function RecipePage() {
       return
     }
 
-    const hasGuidedIngredient = pantryIngredientOptions.some(
-      (ingredient) => normalizeText(ingredient) === normalizeText(guidedIngredient),
-    )
+    if (!guidedCookingTechnique) {
+      setRequestError(t('recipes.guidedValidationTechnique'))
+      return
+    }
 
-    const selectedFocusedIngredients = hasGuidedIngredient && guidedIngredient ? [guidedIngredient] : []
+    if (!guidedDietGoal) {
+      setRequestError(t('recipes.guidedValidationDiet'))
+      return
+    }
+
+    const selectedFocusedIngredients = mergeUniqueLabels(
+      guidedFocusIngredients.filter((targetIngredient) =>
+        pantryIngredientOptions.some(
+          (ingredient) => normalizeText(ingredient) === normalizeText(targetIngredient),
+        ),
+      ),
+    )
+    const guidedContextPayload = {
+      category: guidedCategory,
+      focusIngredients: selectedFocusedIngredients,
+      cookingTechnique: guidedCookingTechnique,
+      dietGoal: guidedDietGoal,
+    }
 
     setFocusedIngredients(selectedFocusedIngredients)
+    setRequestError('')
 
     closeGuidedWizard()
 
     handleGenerateRecipeByName({
       source: 'guided-assistant',
       overrideFocusedIngredients: selectedFocusedIngredients,
-      overridePreferences: preferences,
       overrideDishCategory: guidedCategory,
+      overrideGuidedContext: guidedContextPayload,
     })
   }
 
@@ -1021,9 +1131,10 @@ function RecipePage() {
           <span className="rounded-full bg-kapya-50 px-2.5 py-1 text-[11px] font-semibold text-kapya-800 dark:bg-kapya-900/35 dark:text-kapya-200">
             {t('recipes.selectedBadge', {
               count:
-                preferences.length +
                 focusedIngredients.length +
-                (guidedCategory ? 1 : 0),
+                (guidedCategory ? 1 : 0) +
+                (guidedCookingTechnique ? 1 : 0) +
+                (guidedDietGoal ? 1 : 0),
             })}
           </span>
         </div>
@@ -1034,7 +1145,13 @@ function RecipePage() {
             description={t('recipes.guidedAssistantCardDescription')}
             icon={Search}
             onClick={handleOpenGuidedWizard}
-            isActive={isGuidedWizardOpen || Boolean(guidedCategory) || focusedIngredients.length > 0}
+            isActive={
+              isGuidedWizardOpen ||
+              Boolean(guidedCategory) ||
+              focusedIngredients.length > 0 ||
+              Boolean(guidedCookingTechnique) ||
+              Boolean(guidedDietGoal)
+            }
             disabled={isLoadingRecipe}
             loading={isGuidedCardLoading}
             loadingLabel={loadingTexts[loadingStepIndex]}
@@ -1052,7 +1169,10 @@ function RecipePage() {
           />
         </div>
 
-        {selectedGuidedCategoryLabel || focusedIngredients.length > 0 || selectedPreferenceLabels.length > 0 ? (
+        {selectedGuidedCategoryLabel ||
+        focusedIngredients.length > 0 ||
+        selectedGuidedTechniqueLabel ||
+        selectedGuidedDietLabel ? (
           <div className="flex flex-wrap gap-2">
             {selectedGuidedCategoryLabel ? (
               <span className="rounded-full border border-kapya-200 bg-kapya-50 px-3 py-1 text-xs font-semibold text-kapya-800 dark:border-kapya-700 dark:bg-kapya-900/30 dark:text-kapya-200">
@@ -1069,14 +1189,23 @@ function RecipePage() {
               </span>
             ))}
 
-            {selectedPreferenceLabels.map((label) => (
+            {selectedGuidedTechniqueLabel ? (
               <span
-                key={label}
+                key={selectedGuidedTechniqueLabel}
                 className="rounded-full border border-kapya-200 bg-kapya-50 px-3 py-1 text-xs font-semibold text-kapya-800 dark:border-kapya-700 dark:bg-kapya-900/30 dark:text-kapya-200"
               >
-                {label}
+                {selectedGuidedTechniqueLabel}
               </span>
-            ))}
+            ) : null}
+
+            {selectedGuidedDietLabel ? (
+              <span
+                key={selectedGuidedDietLabel}
+                className="rounded-full border border-kapya-200 bg-kapya-50 px-3 py-1 text-xs font-semibold text-kapya-800 dark:border-kapya-700 dark:bg-kapya-900/30 dark:text-kapya-200"
+              >
+                {selectedGuidedDietLabel}
+              </span>
+            ) : null}
           </div>
         ) : null}
 
@@ -1097,12 +1226,14 @@ function RecipePage() {
         isOpen={isGuidedWizardOpen}
         step={guidedStep}
         selectedCategory={guidedCategory}
-        selectedIngredient={guidedIngredient}
+        selectedIngredients={guidedFocusIngredients}
+        selectedCookingTechnique={guidedCookingTechnique}
+        selectedDietGoal={guidedDietGoal}
         pantryIngredientOptions={pantryIngredientOptions}
-        preferences={preferences}
         onSelectCategory={setGuidedCategory}
-        onSelectIngredient={setGuidedIngredient}
-        onTogglePreference={togglePreference}
+        onToggleIngredient={toggleGuidedFocusIngredient}
+        onSelectCookingTechnique={setGuidedCookingTechnique}
+        onSelectDietGoal={setGuidedDietGoal}
         onStepBack={handleGuidedStepBack}
         onStepNext={handleGuidedStepNext}
         onClose={closeGuidedWizard}

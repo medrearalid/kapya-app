@@ -565,6 +565,31 @@ const sanitizeStringList = (values) => {
   return Array.from(uniqueMap.values())
 }
 
+const normalizeGuidedContext = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  const category = String(value?.category ?? '').trim().toLocaleLowerCase('tr-TR')
+  let rawFocusIngredients = []
+  if (Array.isArray(value?.focusIngredients)) {
+    rawFocusIngredients = value.focusIngredients
+  } else if (Array.isArray(value?.focusedIngredients)) {
+    rawFocusIngredients = value.focusedIngredients
+  }
+
+  const focusIngredients = sanitizeStringList(rawFocusIngredients)
+  const cookingTechnique = String(value?.cookingTechnique ?? '').trim().toLocaleLowerCase('tr-TR')
+  const dietGoal = String(value?.dietGoal ?? '').trim().toLocaleLowerCase('tr-TR')
+
+  return {
+    category,
+    focusIngredients,
+    cookingTechnique,
+    dietGoal,
+  }
+}
+
 const isQuickRecipeDuration = (durationText) => {
   const duration = String(durationText ?? '').trim()
   const minutes = Number.parseInt(duration, 10)
@@ -907,12 +932,7 @@ const calculateRecipePortionCostTl = ({ matchedIngredients, missingIngredients, 
   return Number(totalCost.toFixed(2))
 }
 
-const buildPantryNameSet = (pantryStock) =>
-  new Set(
-    sanitizeProductList(pantryStock)
-      .map((item) => normalizeText(item.name))
-      .filter(Boolean),
-  )
+const buildPantryNameSet = (pantryStock) => buildPantryLookupSet(pantryStock)
 
 const isIngredientInPantry = (ingredientName, pantryNameSet) => {
   const normalized = normalizeText(ingredientName)
@@ -1314,12 +1334,72 @@ const DISH_CATEGORY_PROMPT_RULES = {
     'KATEGORI ATISTIRMALIK: Tarif atıştırmalık formatında, hızlı ve pratik olmalı.',
 }
 
+const GUIDED_COOKING_TECHNIQUE_PROMPT_RULES = {
+  firin: 'PISIRME TEKNIGI FIRIN: Tarifin ana pisirme asamasi firinda tamamlanmali.',
+  tava_ocak:
+    'PISIRME TEKNIGI TAVA/OCAK: Tarifin ana pisirme asamasi tava veya ocak ustunde tamamlanmali.',
+  tencere: 'PISIRME TEKNIGI TENCERE: Tarifin ana pisirme asamasi tencerede tamamlanmali.',
+  pisirme_gerektirmez:
+    'PISIRME TEKNIGI PISIRME GEREKTIRMEZ/CIG: Tarifte isiya dayali pisirme adimi olmasin; soguk/hazir formatta kal.',
+}
+
+const GUIDED_DIET_GOAL_PROMPT_RULES = {
+  yuksek_protein:
+    'DIYET HEDEFI YUKSEK PROTEIN: Tarifte protein yogunlugu yuksek olmali; porsiyon basina protein dengesini artir.',
+  dusuk_karbonhidrat:
+    'DIYET HEDEFI DUSUK KARBONHIDRAT: Tarifte rafine karbonhidrat ve nisa bazli yogunlugu azalt.',
+  sadece_sebze:
+    'DIYET HEDEFI SADECE SEBZE: Tarif tamamen sebze temelli olmali; et, tavuk ve balik kullanma.',
+}
+
+const appendByNamePreferenceInstructions = (dynamicInstructions, normalizedPreferences) => {
+  if (normalizedPreferences.length === 0) {
+    return
+  }
+
+  dynamicInstructions.push('TERCIH FILTRELERI:')
+
+  for (const preference of normalizedPreferences) {
+    const key = normalizeText(preference)
+    if (PREFERENCE_PROMPT_RULES[key]) {
+      dynamicInstructions.push(`- ${PREFERENCE_PROMPT_RULES[key]}`)
+    }
+  }
+}
+
+const appendByNameGuidedContextInstructions = (dynamicInstructions, normalizedGuidedContext) => {
+  const cookingTechniqueRule =
+    GUIDED_COOKING_TECHNIQUE_PROMPT_RULES[normalizedGuidedContext?.cookingTechnique]
+  if (cookingTechniqueRule) {
+    dynamicInstructions.push(cookingTechniqueRule)
+  }
+
+  const dietGoalRule = GUIDED_DIET_GOAL_PROMPT_RULES[normalizedGuidedContext?.dietGoal]
+  if (dietGoalRule) {
+    dynamicInstructions.push(dietGoalRule)
+  }
+}
+
+const toGuidedContextPromptSnapshot = ({ normalizedGuidedContext, normalizedFocusedIngredients }) => {
+  if (!normalizedGuidedContext) {
+    return null
+  }
+
+  return {
+    category: normalizedGuidedContext.category || null,
+    focusIngredients: normalizedFocusedIngredients,
+    cookingTechnique: normalizedGuidedContext.cookingTechnique || null,
+    dietGoal: normalizedGuidedContext.dietGoal || null,
+  }
+}
+
 const buildGenerateRecipeByNamePrompt = ({
   mealName,
   dishCategory,
   pantryStock,
   focusedIngredients,
   preferences,
+  guidedContext,
   isLucky,
   mealType,
   recentRecipeNames,
@@ -1328,7 +1408,11 @@ const buildGenerateRecipeByNamePrompt = ({
 }) => {
   const normalizedMealName = String(mealName ?? '').trim()
   const normalizedPantryStock = toPromptProductSnapshot(pantryStock, MAX_PROMPT_PANTRY_ITEMS)
-  const normalizedFocusedIngredients = sanitizeStringList(focusedIngredients)
+  const normalizedGuidedContext = normalizeGuidedContext(guidedContext)
+  const normalizedFocusedIngredients = sanitizeStringList([
+    ...(Array.isArray(focusedIngredients) ? focusedIngredients : []),
+    ...(normalizedGuidedContext?.focusIngredients || []),
+  ])
   const normalizedPreferences = sanitizeStringList(preferences)
   const normalizedRecentRecipeNames = toPromptRecentRecipeHints(recentRecipeNames)
   const normalizedMealType = String(mealType ?? '').trim().toLocaleLowerCase('tr-TR')
@@ -1349,16 +1433,7 @@ const buildGenerateRecipeByNamePrompt = ({
     )
   }
 
-  if (normalizedPreferences.length > 0) {
-    dynamicInstructions.push('TERCIH FILTRELERI:')
-
-    for (const preference of normalizedPreferences) {
-      const key = normalizeText(preference)
-      if (PREFERENCE_PROMPT_RULES[key]) {
-        dynamicInstructions.push(`- ${PREFERENCE_PROMPT_RULES[key]}`)
-      }
-    }
-  }
+  appendByNamePreferenceInstructions(dynamicInstructions, normalizedPreferences)
 
   if (MEAL_TYPE_PROMPT_RULES[normalizedMealType]) {
     dynamicInstructions.push(MEAL_TYPE_PROMPT_RULES[normalizedMealType])
@@ -1367,6 +1442,8 @@ const buildGenerateRecipeByNamePrompt = ({
   if (DISH_CATEGORY_PROMPT_RULES[normalizedDishCategory]) {
     dynamicInstructions.push(DISH_CATEGORY_PROMPT_RULES[normalizedDishCategory])
   }
+
+  appendByNameGuidedContextInstructions(dynamicInstructions, normalizedGuidedContext)
 
   if (normalizedMealName) {
     dynamicInstructions.push(`Kullanicinin hizli arama ifadesi: ${normalizedMealName}`)
@@ -1381,6 +1458,10 @@ const buildGenerateRecipeByNamePrompt = ({
     pantryStock: normalizedPantryStock,
     focusedIngredients: normalizedFocusedIngredients,
     preferences: normalizedPreferences,
+    guidedContext: toGuidedContextPromptSnapshot({
+      normalizedGuidedContext,
+      normalizedFocusedIngredients,
+    }),
     isLucky: Boolean(isLucky),
     cacheBustToken: String(cacheBustToken ?? ''),
   }
@@ -1395,6 +1476,7 @@ const buildGenerateRecipeByNamePrompt = ({
     '- HARD CONSTRAINT: Malzemeleri Core (ana) ve Auxiliary (yardımcı/baharat) olarak sınıflandır.',
     '- Karar Ağacı: Tarifin zorunlu Core malzemesi pantryStock içinde yoksa tarifi anında REDDET ve stoğa uygun yeni varyasyon ara.',
     '- missingIngredients dizisine SADECE auxiliary malzemeleri yaz. Core malzeme missingIngredients içine ASLA yazılamaz.',
+    '- Kullanıcının belirlediği odak malzemelerin (focusIngredients dizisindeki tüm elemanlar) TARİFİN ANA YAPI TAŞI olması ZORUNLUDUR.',
     "- BAGLAMSAL FARKINDALIK: dishCategory='tatli' ise missingIngredients veya tarif içeriğine KESINLIKLE kimyon, pul biber, karabiber, sarımsak, tuz gibi savory/umami/acı yardımcılar ekleme. Yardımcı malzemeler tatlı lezzet profiline %100 uymalı (örn: tarçın, vanilya, pudra şekeri).",
     '- missingIngredients OPTIONAL alandır. Eğer matchedIngredients yeterliyse missingIngredients dizisini BOS bırak ([]). Sırf alan dolsun diye gereksiz/alakasız eksik üretme.',
     '- mealType verildiyse o ogun disina cikma.',
@@ -1416,6 +1498,7 @@ const GenerateRecipeByNameTool = async ({
   pantryStock,
   focusedIngredients,
   preferences,
+  guidedContext,
   isLucky,
   mealType,
   recentRecipeNames,
@@ -1432,6 +1515,7 @@ const GenerateRecipeByNameTool = async ({
       pantryStock,
       focusedIngredients,
       preferences,
+      guidedContext,
       isLucky,
       mealType,
       recentRecipeNames,
@@ -2179,15 +2263,22 @@ export const executeRecipeByNameAgent = async ({
   pantryStock,
   focusedIngredients,
   preferences,
+  guidedContext,
   isLucky,
   mealType,
   recentRecipeNames,
 }) => {
   const normalizedMealName = String(mealName ?? '').trim()
   const normalizedPantryStock = sanitizeProductList(pantryStock)
-  const normalizedFocusedIngredients = sanitizeStringList(focusedIngredients)
+  const normalizedGuidedContext = normalizeGuidedContext(guidedContext)
+  const normalizedFocusedIngredients = sanitizeStringList([
+    ...(Array.isArray(focusedIngredients) ? focusedIngredients : []),
+    ...(normalizedGuidedContext?.focusIngredients || []),
+  ])
   const normalizedPreferences = sanitizeStringList(preferences)
-  const normalizedDishCategory = String(dishCategory ?? '').trim().toLocaleLowerCase('tr-TR')
+  const normalizedDishCategory = String(dishCategory || normalizedGuidedContext?.category || '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
   const normalizedRecentRecipeNames = sanitizeStringList(recentRecipeNames)
   const recentRecipeNameSet = new Set(
     normalizedRecentRecipeNames.map((recipeName) => normalizeText(recipeName)),
@@ -2197,12 +2288,18 @@ export const executeRecipeByNameAgent = async ({
   const luckyCacheBustToken = luckyMode
     ? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     : ''
+  const hasGuidedContextCriteria =
+    Boolean(normalizedDishCategory) ||
+    normalizedFocusedIngredients.length > 0 ||
+    Boolean(normalizedGuidedContext?.cookingTechnique) ||
+    Boolean(normalizedGuidedContext?.dietGoal)
 
   if (
     !normalizedMealName &&
     !luckyMode &&
     normalizedFocusedIngredients.length === 0 &&
-    normalizedPreferences.length === 0
+    normalizedPreferences.length === 0 &&
+    !hasGuidedContextCriteria
   ) {
     return { tarif: null }
   }
@@ -2220,6 +2317,7 @@ export const executeRecipeByNameAgent = async ({
         pantryStock: normalizedPantryStock,
         focusedIngredients: normalizedFocusedIngredients,
         preferences: normalizedPreferences,
+        guidedContext: normalizedGuidedContext,
         isLucky: luckyMode,
         mealType: normalizedMealType,
         recentRecipeNames: normalizedRecentRecipeNames,
