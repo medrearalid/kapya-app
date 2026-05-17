@@ -211,6 +211,8 @@
     "clearRecipeMemory": "Clear Recipe Memory",
     "clearRecipeMemoryConfirm": "Saved recipes and recipe image cache will be removed. Do you want to continue?",
     "clearRecipeMemorySuccess": "Recipe memory cleared.",
+    "developerModeLabel": "Developer Mode (Agentic Debug)",
+    "developerModeDescription": "Toggle technical A2A logs and the self-correction simulation.",
     "resetData": "Reset All Data",
     "resetDataConfirm": "All application data will be reset. Do you want to continue?"
   },

@@ -21,6 +21,8 @@ function SettingsPage() {
   const clearGeneratedRecipes = usePantryStore((state) => state.clearGeneratedRecipes)
   const clearRecentRecipes = usePantryStore((state) => state.clearRecentRecipes)
   const showToast = usePantryStore((state) => state.showToast)
+  const developerMode = usePantryStore((state) => state.developerMode)
+  const toggleDeveloperMode = usePantryStore((state) => state.toggleDeveloperMode)
   const clearRecipeMemory = useRecipeStore((state) => state.clearRecipeMemory)
 
   const activeLanguage = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'tr'
@@ -155,6 +157,40 @@ function SettingsPage() {
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           {t('settings.clearRecipeMemory')}
         </TapButton>
+
+        <div className="mt-3 rounded-xl border border-emerald-200/70 bg-emerald-50/65 px-3 py-2.5 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                {t('settings.developerModeLabel')}
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-900/70 dark:text-emerald-200/80">
+                {t('settings.developerModeDescription')}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={developerMode}
+              aria-label={t('settings.developerModeLabel')}
+              onClick={toggleDeveloperMode}
+              className={[
+                'relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kapya-400',
+                developerMode
+                  ? 'bg-emerald-500 shadow-md shadow-emerald-500/35'
+                  : 'bg-slate-300 dark:bg-slate-700',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
+                  developerMode ? 'translate-x-6' : 'translate-x-1',
+                ].join(' ')}
+              />
+            </button>
+          </div>
+        </div>
       </article>
 
       <article className="glass-panel soft-card rounded-2xl p-4">

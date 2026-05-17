@@ -5,6 +5,7 @@ import { useEffect, useMemo } from 'react'
 import CookingLoader from './cooking-loader'
 import { streamInsight } from '../services/insights-api'
 import { useBehaviorStore } from '../store/behavior-store'
+import { usePantryStore } from '../store/pantry-store'
 
 const INSIGHT_TRIGGER = 'wallet_page'
 
@@ -33,6 +34,7 @@ FinanceStat.propTypes = {
 }
 
 function FinanceInsightCard({ pantryProducts, financeData }) {
+  const developerMode = usePantryStore((s) => s.developerMode)
   const buildUserContext = useBehaviorStore((s) => s.buildUserContext)
   const insightState = useBehaviorStore((s) => s.insightByTrigger?.[INSIGHT_TRIGGER])
   const beginInsightStream = useBehaviorStore((s) => s.beginInsightStream)
@@ -46,8 +48,9 @@ function FinanceInsightCard({ pantryProducts, financeData }) {
       pantryProducts,
       financeData,
       userContext: buildUserContext(),
+      developerMode,
     }),
-    [pantryProducts, financeData, buildUserContext],
+    [pantryProducts, financeData, buildUserContext, developerMode],
   )
   const requestKey = useMemo(() => JSON.stringify(requestPayload), [requestPayload])
 
@@ -75,7 +78,11 @@ function FinanceInsightCard({ pantryProducts, financeData }) {
   if (insightState?.loading) {
     return (
       <div className="flex justify-center rounded-2xl border border-kapya-200/60 bg-kapya-50/60 py-5 dark:border-kapya-800/40 dark:bg-kapya-950/20">
-        <CookingLoader log={insightState?.log || ''} />
+        <CookingLoader
+          log={insightState?.log || ''}
+          logs={insightState?.logHistory || []}
+          developerMode={developerMode}
+        />
       </div>
     )
   }

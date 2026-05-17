@@ -211,6 +211,8 @@
     "clearRecipeMemory": "Tarif Hafızasını Temizle",
     "clearRecipeMemoryConfirm": "Kayıtlı tarifler ve tarif görsel önbelleği silinecek. Devam etmek istiyor musun?",
     "clearRecipeMemorySuccess": "Tarif hafızası temizlendi.",
+    "developerModeLabel": "Geliştirici Modu (Agentic Debug)",
+    "developerModeDescription": "A2A akışında teknik logları ve self-correction simulasyonunu aç/kapat.",
     "resetData": "Tüm Verileri Sıfırla",
     "resetDataConfirm": "Tüm uygulama verileri sıfırlanacak. Devam etmek istiyor musun?"
   },

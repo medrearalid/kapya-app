@@ -436,6 +436,7 @@ export const usePantryStore = create(
   selectedBudgetProfile: getSavedBudgetProfile(),
   hasCompletedOnboarding: getSavedOnboardingState(),
   currentTheme: getInitialTheme(),
+  developerMode: false,
   products: createDefaultProducts(),
   finance: {
     ...FINANCE_DEFAULT_STATE,
@@ -469,6 +470,15 @@ export const usePantryStore = create(
       }
     }),
 
+  setDeveloperMode: (value) => {
+    set({ developerMode: value === true })
+  },
+
+  toggleDeveloperMode: () =>
+    set((state) => ({
+      developerMode: !state.developerMode,
+    })),
+
   updateBudgetProfile: (profile) => {
     if (!budgetProfileOptions.some((option) => option.id === profile)) {
       return
@@ -498,6 +508,7 @@ export const usePantryStore = create(
     set(() => ({
       selectedBudgetProfile: budgetProfileOptions[0].id,
       hasCompletedOnboarding: false,
+      developerMode: false,
       products: createDefaultProducts(),
       finance: {
         ...FINANCE_DEFAULT_STATE,
@@ -789,6 +800,7 @@ export const usePantryStore = create(
       partialize: (state) => ({
         selectedBudgetProfile: state.selectedBudgetProfile,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        developerMode: state.developerMode,
         products: state.products,
         recentRecipeNames: state.recentRecipeNames,
         finance: state.finance,
@@ -801,6 +813,7 @@ export const usePantryStore = create(
 
         return {
           ...mergedState,
+          developerMode: mergedState?.developerMode === true,
           products: (Array.isArray(mergedState?.products) ? mergedState.products : [])
             .map(normalizeStoredProduct)
             .sort((left, right) => {

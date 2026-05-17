@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 const BEHAVIOR_STORAGE_KEY = 'kapya-behavior-store'
 const MAX_HISTORY_SIZE = 50
+const MAX_INSIGHT_LOG_HISTORY = 45
 const INSIGHT_TRIGGERS = Object.freeze(['planner_page', 'wallet_page'])
 
 const toNormalizedName = (value) => String(value ?? '').trim()
@@ -12,6 +13,7 @@ const createEmptyInsightState = () => ({
     loading: false,
     requestKey: '',
     log: '',
+    logHistory: [],
     data: null,
     error: '',
   },
@@ -19,6 +21,7 @@ const createEmptyInsightState = () => ({
     loading: false,
     requestKey: '',
     log: '',
+    logHistory: [],
     data: null,
     error: '',
   },
@@ -34,6 +37,21 @@ const addUnique = (list, item, maxSize) => {
   if (!name) return list
   const filtered = list.filter((existing) => toNormalizedName(existing) !== name)
   return [name, ...filtered].slice(0, maxSize)
+}
+
+const appendInsightLog = (history, message) => {
+  const normalizedMessage = toNormalizedName(message)
+  if (!normalizedMessage) {
+    return Array.isArray(history) ? history : []
+  }
+
+  const baseHistory = Array.isArray(history) ? history : []
+  const lastMessage = toNormalizedName(baseHistory.at(-1))
+  if (lastMessage === normalizedMessage) {
+    return baseHistory
+  }
+
+  return [...baseHistory, normalizedMessage].slice(-MAX_INSIGHT_LOG_HISTORY)
 }
 
 export const useBehaviorStore = create(
@@ -57,6 +75,7 @@ export const useBehaviorStore = create(
             loading: false,
             requestKey: '',
             log: '',
+            logHistory: [],
             data: null,
             error: '',
           }
@@ -77,6 +96,7 @@ export const useBehaviorStore = create(
                 loading: true,
                 requestKey: normalizedRequestKey,
                 log: '',
+                logHistory: [],
                 data: null,
                 error: '',
               },
@@ -91,10 +111,12 @@ export const useBehaviorStore = create(
             loading: false,
             requestKey: '',
             log: '',
+            logHistory: [],
             data: null,
             error: '',
           }
           const normalizedMessage = toNormalizedName(message)
+          const nextLogHistory = appendInsightLog(currentInsight.logHistory, normalizedMessage)
 
           return {
             currentAgentLog: normalizedMessage,
@@ -103,6 +125,7 @@ export const useBehaviorStore = create(
               [safeTrigger]: {
                 ...currentInsight,
                 log: normalizedMessage,
+                logHistory: nextLogHistory,
               },
             },
           }
@@ -115,6 +138,7 @@ export const useBehaviorStore = create(
             loading: false,
             requestKey: '',
             log: '',
+            logHistory: [],
             data: null,
             error: '',
           }
@@ -147,6 +171,7 @@ export const useBehaviorStore = create(
             loading: false,
             requestKey: '',
             log: '',
+            logHistory: [],
             data: null,
             error: '',
           }
@@ -182,6 +207,7 @@ export const useBehaviorStore = create(
                 loading: false,
                 requestKey: '',
                 log: '',
+                logHistory: [],
                 data: null,
                 error: '',
               },

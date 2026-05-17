@@ -4,7 +4,8 @@ const VALID_TRIGGERS = new Set(['planner_page', 'wallet_page'])
 
 export const streamInsightTrigger = async (request, response, next) => {
   try {
-    const { trigger, plannedMeals, pantryProducts, financeData, userContext } = request.body ?? {}
+    const { trigger, plannedMeals, pantryProducts, financeData, userContext, developerMode } =
+      request.body ?? {}
 
     if (!trigger || !VALID_TRIGGERS.has(String(trigger))) {
       return response.status(400).json({
@@ -30,6 +31,7 @@ export const streamInsightTrigger = async (request, response, next) => {
         pantryProducts: Array.isArray(pantryProducts) ? pantryProducts : [],
         financeData: financeData && typeof financeData === 'object' ? financeData : {},
         userContext: userContext && typeof userContext === 'object' ? userContext : {},
+        developerMode: developerMode === true,
       },
       emit,
     )
@@ -54,7 +56,8 @@ export const streamInsightTrigger = async (request, response, next) => {
 
 export const postInsightTrigger = async (request, response, next) => {
   try {
-    const { trigger, plannedMeals, pantryProducts, financeData, userContext } = request.body ?? {}
+    const { trigger, plannedMeals, pantryProducts, financeData, userContext, developerMode } =
+      request.body ?? {}
 
     if (!trigger || !VALID_TRIGGERS.has(String(trigger))) {
       return response.status(400).json({
@@ -69,6 +72,7 @@ export const postInsightTrigger = async (request, response, next) => {
       pantryProducts: Array.isArray(pantryProducts) ? pantryProducts : [],
       financeData: financeData && typeof financeData === 'object' ? financeData : {},
       userContext: userContext && typeof userContext === 'object' ? userContext : {},
+      developerMode: developerMode === true,
     })
 
     if (!result) {

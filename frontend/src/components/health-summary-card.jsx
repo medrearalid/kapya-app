@@ -5,6 +5,7 @@ import { useEffect, useMemo } from 'react'
 import CookingLoader from './cooking-loader'
 import { streamInsight } from '../services/insights-api'
 import { useBehaviorStore } from '../store/behavior-store'
+import { usePantryStore } from '../store/pantry-store'
 
 const INSIGHT_TRIGGER = 'planner_page'
 
@@ -29,6 +30,7 @@ StatPill.propTypes = {
 }
 
 function HealthSummaryCard({ plannedMeals }) {
+  const developerMode = usePantryStore((s) => s.developerMode)
   const buildUserContext = useBehaviorStore((s) => s.buildUserContext)
   const insightState = useBehaviorStore((s) => s.insightByTrigger?.[INSIGHT_TRIGGER])
   const beginInsightStream = useBehaviorStore((s) => s.beginInsightStream)
@@ -41,8 +43,9 @@ function HealthSummaryCard({ plannedMeals }) {
       trigger: INSIGHT_TRIGGER,
       plannedMeals,
       userContext: buildUserContext(),
+      developerMode,
     }),
-    [plannedMeals, buildUserContext],
+    [plannedMeals, buildUserContext, developerMode],
   )
   const requestKey = useMemo(() => JSON.stringify(requestPayload), [requestPayload])
 
@@ -70,7 +73,11 @@ function HealthSummaryCard({ plannedMeals }) {
   if (insightState?.loading) {
     return (
       <div className="flex justify-center rounded-2xl border border-emerald-200/60 bg-emerald-50/60 py-5 dark:border-emerald-800/40 dark:bg-emerald-950/20">
-        <CookingLoader log={insightState?.log || ''} />
+        <CookingLoader
+          log={insightState?.log || ''}
+          logs={insightState?.logHistory || []}
+          developerMode={developerMode}
+        />
       </div>
     )
   }

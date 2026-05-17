@@ -8,7 +8,48 @@ const emitLog = (message) => emitterStorage.getStore()?.(message)
 
 const MODEL_NAME = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-pro'
 const MAX_RETRIES = 1
+const NODE_DELAY_MS = 1500
 const CURRENT_MONTH_KEY = () => new Date().toISOString().slice(0, 7)
+
+const DEFAULT_RUNTIME_CONFIG = Object.freeze({
+  developerMode: false,
+  artificialDelayMs: 0,
+  forceDietitianConflict: false,
+})
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const normalizeRuntimeConfig = (developerMode) => {
+  if (developerMode === true) {
+    return {
+      developerMode: true,
+      artificialDelayMs: NODE_DELAY_MS,
+      forceDietitianConflict: true,
+    }
+  }
+
+  return { ...DEFAULT_RUNTIME_CONFIG }
+}
+
+const isDeveloperMode = (state) => state?.runtime?.developerMode === true
+
+const emitStageLog = (state, normalMessage, developerMessage = normalMessage) => {
+  const selectedMessage = isDeveloperMode(state) ? developerMessage : normalMessage
+  const text = String(selectedMessage ?? '').trim()
+  if (text) {
+    emitLog(text)
+  }
+}
+
+const waitForNodeDelay = async (state, nodeName) => {
+  const delayMs = Number(state?.runtime?.artificialDelayMs) || 0
+  if (delayMs <= 0) {
+    return
+  }
+
+  emitLog(`[latency] ${nodeName} sleep=${delayMs}ms`)
+  await sleep(delayMs)
+}
 
 const getApiKey = () => {
   const key = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim()
@@ -93,10 +134,12 @@ const financeSchema = {
 
 const KapyaState = Annotation.Root({
   knowledgeBase: Annotation({ reducer: (_, b) => b, default: () => ({}) }),
+  runtime: Annotation({ reducer: (_, b) => b, default: () => ({ ...DEFAULT_RUNTIME_CONFIG }) }),
   workerType: Annotation({ reducer: (_, b) => b, default: () => '' }),
   result: Annotation({ reducer: (_, b) => b, default: () => null }),
   retryCount: Annotation({ reducer: (_, b) => b, default: () => 0 }),
   validationError: Annotation({ reducer: (_, b) => b, default: () => null }),
+  forcedConflictInjected: Annotation({ reducer: (_, b) => b, default: () => false }),
 })
 
 // ── 4. Gemini call helper ────────────────────────────────────────────────────
@@ -119,11 +162,23 @@ async function callGemini({ prompt, schema }) {
 // ── 5. Supervisor Node ───────────────────────────────────────────────────────
 // Reads the KB trigger and dispatches to the correct worker. No LLM call here.
 
-function supervisorNode(state) {
-  emitLog('🧠 Supervisor: Bilgi tabanı (Knowledge Base) senkronize ediliyor...')
+async function supervisorNode(state) {
+  await waitForNodeDelay(state, 'supervisor')
+
   const trigger = String(state.knowledgeBase?.trigger ?? '').toLowerCase()
   const workerType = (trigger === 'wallet_page' || trigger === 'finance') ? 'finance' : 'dietitian'
-  emitLog('🔍 Supervisor: Mutfak stokları ve geçmiş tüketim analiz ediliyor...')
+
+  emitStageLog(
+    state,
+    'Mutfak stoklari analiz ediliyor...',
+    `[supervisor] trigger=${trigger || 'unknown'} planFacts=${state.knowledgeBase?.planFacts?.length || 0} pantryFacts=${state.knowledgeBase?.pantryFacts?.length || 0}`,
+  )
+  emitStageLog(
+    state,
+    workerType === 'finance' ? 'Mutfak butce dengesi hesaplanıyor...' : 'Kalori dengesi kuruluyor...',
+    `[supervisor] route -> workerType=${workerType}`,
+  )
+
   return { workerType }
 }
 
@@ -134,16 +189,29 @@ function supervisorRouter(state) {
 // ── 6. Worker Nodes ──────────────────────────────────────────────────────────
 
 async function dietitianWorkerNode(state) {
-  emitLog('👨‍🍳 Şef Ajan: Elimizdeki malzemelerle geleneksel tarif kombinasyonları taranıyor...')
-  emitLog('🩺 Diyetisyen Ajan: Tarifin makro ve kalori değerleri hedeflere göre optimize ediliyor...')
+  await waitForNodeDelay(state, 'dietitian')
+
   const { knowledgeBase, validationError, retryCount } = state
   const { planFacts, behaviorFacts } = knowledgeBase
+
+  emitStageLog(
+    state,
+    'Kalori dengesi kuruluyor...',
+    `[dietitian] start retry=${retryCount} validationError=${validationError || 'none'}`,
+  )
+
   const mealLines = planFacts.length
     ? planFacts.map((m) => `${m.date} ${m.mealType}: ${m.recipeName} (${m.portionSize} kisi${m.kaloriNote ? ', ' + m.kaloriNote : ''})`).join('\n')
     : 'Plan bos.'
   const correctionLine = validationError && retryCount > 0
     ? `[DUZELTME] Onceki ciktin hataliydı: "${validationError}". Degerler bilimsel aralikta olmali.`
     : ''
+
+  emitStageLog(
+    state,
+    'Beslenme dengesi son kez kontrol ediliyor...',
+    `[dietitian] planFacts=${planFacts.length} cooked=${behaviorFacts.cookedRecipes.length} swiped=${behaviorFacts.swipedRecipes.length}`,
+  )
 
   const prompt = [
     'Sen DietitianAgent olarak YALNIZCA asagidaki Knowledge Base verilerini kullaniyorsun.',
@@ -157,20 +225,46 @@ async function dietitianWorkerNode(state) {
 
   try {
     const result = await callGemini({ prompt, schema: dietitianSchema })
+
+    emitStageLog(
+      state,
+      'Saglik metrikleri olusturuluyor...',
+      `[dietitian] model-ok keys=${Object.keys(result || {}).join(',')}`,
+    )
+
     return { result }
-  } catch {
+  } catch (error) {
+    emitStageLog(
+      state,
+      'Saglik analizi tekrar denenecek...',
+      `[dietitian] model-error=${error?.message || 'unknown'}`,
+    )
+
     return { result: null }
   }
 }
 
 async function financeWorkerNode(state) {
-  emitLog('💼 Finans Ajanı: Porsiyon maliyeti ve tasarruf oranı hesaplanıyor...')
-  emitLog('📊 Finans Ajanı: Kiler verileri israf analizi için işleniyor...')
+  await waitForNodeDelay(state, 'finance')
+
   const { knowledgeBase, validationError, retryCount } = state
   const { pantryFacts, financeFacts, behaviorFacts } = knowledgeBase
+
+  emitStageLog(
+    state,
+    'Mutfak butce dengesi hesaplanıyor...',
+    `[finance] start retry=${retryCount} validationError=${validationError || 'none'}`,
+  )
+
   const correctionLine = validationError && retryCount > 0
     ? `[DUZELTME] Onceki ciktin hataliydı: "${validationError}". Negatif deger kullanma.`
     : ''
+
+  emitStageLog(
+    state,
+    'Tasarruf ve israf dengesi hesaplanıyor...',
+    `[finance] pantryFacts=${pantryFacts.length} spend=${financeFacts.thisMonthSpend} preventedWaste=${financeFacts.thisMonthPreventedWaste} wastedIngredients=${behaviorFacts.wastedIngredients.length}`,
+  )
 
   const prompt = [
     'Sen FinanceAgent olarak YALNIZCA asagidaki Knowledge Base verilerini kullaniyorsun.',
@@ -187,50 +281,123 @@ async function financeWorkerNode(state) {
 
   try {
     const result = await callGemini({ prompt, schema: financeSchema })
+
+    emitStageLog(
+      state,
+      'Finans ozeti olusturuluyor...',
+      `[finance] model-ok keys=${Object.keys(result || {}).join(',')}`,
+    )
+
     return { result }
-  } catch {
+  } catch (error) {
+    emitStageLog(
+      state,
+      'Finans analizi tekrar denenecek...',
+      `[finance] model-error=${error?.message || 'unknown'}`,
+    )
+
     return { result: null }
   }
 }
 
 // ── 7. Validator Node (Self-Correction Loop) ─────────────────────────────────
 
-function validatorNode(state) {
-  emitLog('🔎 Doğrulayıcı: Çıktı güvenilirlik ve tutarlılık kontrolünden geçiriliyor...')
+const shouldInjectDietitianConflict = ({ state, workerType, retryCount }) =>
+  workerType === 'dietitian' &&
+  isDeveloperMode(state) &&
+  state.runtime?.forceDietitianConflict === true &&
+  state.forcedConflictInjected !== true &&
+  retryCount === 0
+
+const getDietitianValidationError = (result) => {
+  const cal = Number(result.avgDailyCalorie)
+  const score = Number(result.healthScore)
+
+  if (!Number.isFinite(cal) || cal < 50 || cal > 8000) {
+    return `avgDailyCalorie gecersiz: ${cal}`
+  }
+
+  if (!Number.isFinite(score) || score < 0 || score > 100) {
+    return `healthScore gecersiz: ${score}`
+  }
+
+  if (
+    Number(result.avgDailyProtein) < 0 ||
+    Number(result.avgDailyCarb) < 0 ||
+    Number(result.avgDailyFat) < 0
+  ) {
+    return 'Makro degerler negatif olamaz.'
+  }
+
+  return ''
+}
+
+const getFinanceValidationError = (result) => {
+  const saved = Number(result.savedBalance)
+  const waste = Number(result.wasteLoss)
+  const avg = Number(result.avgMealCost)
+
+  if (!Number.isFinite(saved) || saved < 0) {
+    return `savedBalance negatif/gecersiz: ${saved}`
+  }
+
+  if (!Number.isFinite(waste) || waste < 0) {
+    return `wasteLoss negatif/gecersiz: ${waste}`
+  }
+
+  if (!Number.isFinite(avg) || avg < 0 || avg > 10000) {
+    return `avgMealCost aralik disi: ${avg}`
+  }
+
+  return ''
+}
+
+async function validatorNode(state) {
+  await waitForNodeDelay(state, 'validator')
+
   const { result, workerType, retryCount } = state
+
+  emitStageLog(
+    state,
+    'Son kontrol yapiliyor...',
+    `[validator] start workerType=${workerType} retryCount=${retryCount}`,
+  )
+
+  const rejectValidation = (reason, extraState = {}) => {
+    emitStageLog(state, '', `[validator] reject reason=${reason}`)
+    return {
+      validationError: reason,
+      retryCount: retryCount + 1,
+      ...extraState,
+    }
+  }
+
   if (!result || typeof result !== 'object') {
-    return { validationError: 'Ajan gecerli sonuc dondurmedi.', retryCount: retryCount + 1 }
+    return rejectValidation('Ajan gecerli sonuc dondurmedi.')
+  }
+
+  if (shouldInjectDietitianConflict({ state, workerType, retryCount })) {
+    return rejectValidation(
+      'DietitianAgent REJECT chefProposal: makro dagilimi hedef araligin disinda (simulasyon).',
+      { forcedConflictInjected: true },
+    )
   }
 
   if (workerType === 'dietitian') {
-    const cal = Number(result.avgDailyCalorie)
-    const score = Number(result.healthScore)
-    if (!Number.isFinite(cal) || cal < 50 || cal > 8000) {
-      return { validationError: `avgDailyCalorie gecersiz: ${cal}`, retryCount: retryCount + 1 }
-    }
-    if (!Number.isFinite(score) || score < 0 || score > 100) {
-      return { validationError: `healthScore gecersiz: ${score}`, retryCount: retryCount + 1 }
-    }
-    if (Number(result.avgDailyProtein) < 0 || Number(result.avgDailyCarb) < 0 || Number(result.avgDailyFat) < 0) {
-      return { validationError: 'Makro degerler negatif olamaz.', retryCount: retryCount + 1 }
+    const validationError = getDietitianValidationError(result)
+    if (validationError) {
+      return rejectValidation(validationError)
     }
   }
 
   if (workerType === 'finance') {
-    const saved = Number(result.savedBalance)
-    const waste = Number(result.wasteLoss)
-    const avg = Number(result.avgMealCost)
-    if (!Number.isFinite(saved) || saved < 0) {
-      return { validationError: `savedBalance negatif/gecersiz: ${saved}`, retryCount: retryCount + 1 }
-    }
-    if (!Number.isFinite(waste) || waste < 0) {
-      return { validationError: `wasteLoss negatif/gecersiz: ${waste}`, retryCount: retryCount + 1 }
-    }
-    if (!Number.isFinite(avg) || avg < 0 || avg > 10000) {
-      return { validationError: `avgMealCost aralik disi: ${avg}`, retryCount: retryCount + 1 }
+    const validationError = getFinanceValidationError(result)
+    if (validationError) {
+      return rejectValidation(validationError)
     }
   }
 
+  emitStageLog(state, 'Analiz tamamlandi.', `[validator] accept workerType=${workerType}`)
   return { validationError: null }
 }
 
@@ -264,16 +431,21 @@ const kapyaGraph = new StateGraph(KapyaState)
 
 // ── 9. Public API ─────────────────────────────────────────────────────────────
 
-export async function runInsightAgent({ trigger, plannedMeals, pantryProducts, financeData, userContext }) {
+export async function runInsightAgent({ trigger, plannedMeals, pantryProducts, financeData, userContext, developerMode = false }) {
+  const runtime = normalizeRuntimeConfig(developerMode)
   const knowledgeBase = buildKnowledgeBase({ trigger, plannedMeals, pantryProducts, financeData, userContext })
-  const state = await kapyaGraph.invoke({ knowledgeBase })
+  const state = await kapyaGraph.invoke({ knowledgeBase, runtime })
   return state.result
 }
 
 // Streaming variant — emitFn is called with each log message in real-time.
-export async function runInsightAgentStreaming({ trigger, plannedMeals, pantryProducts, financeData, userContext }, emitFn) {
+export async function runInsightAgentStreaming(
+  { trigger, plannedMeals, pantryProducts, financeData, userContext, developerMode = false },
+  emitFn,
+) {
+  const runtime = normalizeRuntimeConfig(developerMode)
   const knowledgeBase = buildKnowledgeBase({ trigger, plannedMeals, pantryProducts, financeData, userContext })
-  const state = await emitterStorage.run(emitFn, () => kapyaGraph.invoke({ knowledgeBase }))
+  const state = await emitterStorage.run(emitFn, () => kapyaGraph.invoke({ knowledgeBase, runtime }))
   return state.result
 }
 
