@@ -1,6 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { GoogleGenAI } from '@google/genai'
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
+import {
+  buildInsightSemanticCacheKey,
+  readSemanticCacheJson,
+  writeSemanticCacheJson,
+} from './semantic-cache-service.js'
 
 // Per-request emit context — thread-safe via AsyncLocalStorage
 const emitterStorage = new AsyncLocalStorage()
@@ -59,6 +64,19 @@ const getApiKey = () => {
     throw err
   }
   return key
+}
+
+const resolveCachedInsightResult = async (cacheKey) => {
+  if (!cacheKey) {
+    return null
+  }
+
+  const cachedValue = await readSemanticCacheJson({ key: cacheKey })
+  if (!cachedValue || typeof cachedValue !== 'object' || Array.isArray(cachedValue)) {
+    return null
+  }
+
+  return cachedValue
 }
 
 // ── 1. Knowledge Base Builder ────────────────────────────────────────────────
@@ -434,7 +452,26 @@ const kapyaGraph = new StateGraph(KapyaState)
 export async function runInsightAgent({ trigger, plannedMeals, pantryProducts, financeData, userContext, developerMode = false }) {
   const runtime = normalizeRuntimeConfig(developerMode)
   const knowledgeBase = buildKnowledgeBase({ trigger, plannedMeals, pantryProducts, financeData, userContext })
+  const insightCacheKey = developerMode
+    ? ''
+    : buildInsightSemanticCacheKey({
+        trigger,
+        knowledgeBase,
+      })
+
+  const cachedResult = await resolveCachedInsightResult(insightCacheKey)
+  if (cachedResult) {
+    return cachedResult
+  }
+
   const state = await kapyaGraph.invoke({ knowledgeBase, runtime })
+  if (state?.result) {
+    writeSemanticCacheJson({
+      key: insightCacheKey,
+      value: state.result,
+    })
+  }
+
   return state.result
 }
 
@@ -445,7 +482,29 @@ export async function runInsightAgentStreaming(
 ) {
   const runtime = normalizeRuntimeConfig(developerMode)
   const knowledgeBase = buildKnowledgeBase({ trigger, plannedMeals, pantryProducts, financeData, userContext })
+  const insightCacheKey = developerMode
+    ? ''
+    : buildInsightSemanticCacheKey({
+        trigger,
+        knowledgeBase,
+      })
+
+  const cachedResult = await resolveCachedInsightResult(insightCacheKey)
+  if (cachedResult) {
+    if (typeof emitFn === 'function') {
+      emitFn('Onbellekten hizli sonuc donduruldu.')
+    }
+    return cachedResult
+  }
+
   const state = await emitterStorage.run(emitFn, () => kapyaGraph.invoke({ knowledgeBase, runtime }))
+  if (state?.result) {
+    writeSemanticCacheJson({
+      key: insightCacheKey,
+      value: state.result,
+    })
+  }
+
   return state.result
 }
 

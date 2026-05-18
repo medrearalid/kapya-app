@@ -1,4 +1,9 @@
 import { GoogleGenAI } from '@google/genai'
+import {
+  buildRecipeSemanticCacheKey,
+  readSemanticCacheJson,
+  writeSemanticCacheJson,
+} from './semantic-cache-service.js'
 
 const TEXT_MODEL_NAME = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash'
 const IMAGE_MODEL_NAME = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview'
@@ -2145,6 +2150,23 @@ const getRandomNonRecentCatalogRecipeName = (recentRecipeNameSet) => {
   return String(sourcePool[randomIndex]?.tarifAdi ?? '').trim()
 }
 
+const resolveCachedRecipeResponse = async (cacheKey) => {
+  if (!cacheKey) {
+    return null
+  }
+
+  const cachedValue = await readSemanticCacheJson({ key: cacheKey })
+  if (!cachedValue || typeof cachedValue !== 'object' || Array.isArray(cachedValue)) {
+    return null
+  }
+
+  if (!cachedValue?.tarif || typeof cachedValue.tarif !== 'object') {
+    return null
+  }
+
+  return cachedValue
+}
+
 export const executeKapyaAgent = async ({
   budgetProfile,
   pantryStock,
@@ -2154,8 +2176,6 @@ export const executeKapyaAgent = async ({
   recentRecipeNames,
 }) => {
   try {
-    const ai = getTextAiClient()
-
     const normalizedPantryStock = sanitizeProductList(pantryStock)
     const normalizedUrgentProducts = sanitizeProductList(urgentProducts)
     const normalizedRecentRecipeNames = sanitizeStringList(recentRecipeNames)
@@ -2167,6 +2187,23 @@ export const executeKapyaAgent = async ({
     if (combinedStock.length === 0) {
       return { tarif: null }
     }
+
+    const recipeCacheKey = buildRecipeSemanticCacheKey({
+      mode: 'waste_saver',
+      budgetProfile,
+      pantryStock: combinedStock,
+      urgentProducts: normalizedUrgentProducts,
+      requestMode,
+      agentInstruction,
+      recentRecipeNames: normalizedRecentRecipeNames,
+    })
+
+    const cachedRecipeResponse = await resolveCachedRecipeResponse(recipeCacheKey)
+    if (cachedRecipeResponse) {
+      return cachedRecipeResponse
+    }
+
+    const ai = getTextAiClient()
 
     let normalizedGeneratedRecipe = null
     let correctionHint = ''
@@ -2248,9 +2285,16 @@ export const executeKapyaAgent = async ({
       recipe: baseRecipe,
     })
 
-    return {
+    const responsePayload = {
       tarif: enrichedRecipe,
     }
+
+    writeSemanticCacheJson({
+      key: recipeCacheKey,
+      value: responsePayload,
+    })
+
+    return responsePayload
   } catch (error) {
     console.error('[agent] executeKapyaAgent failed:', String(error?.message ?? error))
     return { error: true, message: AGENT_HALLUCINATION_ERROR_MESSAGE }
@@ -2305,6 +2349,25 @@ export const executeRecipeByNameAgent = async ({
   }
 
   try {
+    const recipeCacheKey = luckyMode
+      ? ''
+      : buildRecipeSemanticCacheKey({
+          mode: 'recipe_by_name',
+          mealName: normalizedMealName,
+          dishCategory: normalizedDishCategory,
+          mealType: normalizedMealType,
+          pantryStock: normalizedPantryStock,
+          focusedIngredients: normalizedFocusedIngredients,
+          preferences: normalizedPreferences,
+          guidedContext: normalizedGuidedContext,
+          recentRecipeNames: normalizedRecentRecipeNames,
+        })
+
+    const cachedRecipeResponse = await resolveCachedRecipeResponse(recipeCacheKey)
+    if (cachedRecipeResponse) {
+      return cachedRecipeResponse
+    }
+
     const ai = getTextAiClient()
     let normalizedRecipe = null
     let correctionHint = ''
@@ -2425,9 +2488,16 @@ export const executeRecipeByNameAgent = async ({
       recipe: normalizedRecipeWithCost,
     })
 
-    return {
+    const responsePayload = {
       tarif: normalizedRecipeWithImage,
     }
+
+    writeSemanticCacheJson({
+      key: recipeCacheKey,
+      value: responsePayload,
+    })
+
+    return responsePayload
   } catch (error) {
     console.error('[agent] executeRecipeByNameAgent failed:', String(error?.message ?? error))
     return { error: true, message: AGENT_HALLUCINATION_ERROR_MESSAGE }

@@ -1,4 +1,9 @@
 import { GoogleGenAI } from '@google/genai'
+import {
+  buildRecipeSemanticCacheKey,
+  readSemanticCacheJson,
+  writeSemanticCacheJson,
+} from './semantic-cache-service.js'
 
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 const RECEIPT_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash-lite'
@@ -208,6 +213,23 @@ export const generateWasteSaverRecipes = async ({
     .map(sanitizeProduct)
     .filter((product) => product.urunAdi)
 
+  const recipeCacheKey = buildRecipeSemanticCacheKey({
+    mode: 'legacy_waste_saver',
+    budgetProfile: normalizedBudgetProfile,
+    pantryStock: normalizedPantryStock,
+    urgentProducts: normalizedUrgentProducts,
+  })
+
+  const cachedValue = await readSemanticCacheJson({ key: recipeCacheKey })
+  if (
+    cachedValue &&
+    typeof cachedValue === 'object' &&
+    !Array.isArray(cachedValue) &&
+    Array.isArray(cachedValue?.tarifler)
+  ) {
+    return cachedValue
+  }
+
   const ai = new GoogleGenAI({ apiKey })
   const response = await ai.models.generateContent({
     model: MODEL_NAME,
@@ -231,6 +253,11 @@ export const generateWasteSaverRecipes = async ({
   if (!parsedResponse.tarifler.every(isValidGeneratedRecipe)) {
     throw new Error('AI modeli 1 kisilik baseAmount formatini saglamayan tarif dondurdu.')
   }
+
+  writeSemanticCacheJson({
+    key: recipeCacheKey,
+    value: parsedResponse,
+  })
 
   return parsedResponse
 }
