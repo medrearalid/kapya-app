@@ -230,10 +230,22 @@
   },
   "wallet": {
     "badge": "Finance",
-    "title": "Wallet",
+    "title": "Kitchen Inflation Dashboard",
+    "subtitle": "Track inventory exposure, cooked meal costs, and waste prevention gains in one view.",
+    "inventoryCostTitle": "Total Inventory Value",
+    "inventoryCostDescription": "Current stock value from unit cost x quantity",
+    "totalConsumedTitle": "Total Cooked Value",
+    "totalConsumedDescription": "Accumulated plate cost of completed meals",
     "monthlySpendTitle": "Kitchen Spending This Month",
     "thisMonthLabel": "Total amount added from receipts",
+    "monthlyPanelTitle": "Monthly Cost Pressure",
+    "monthlySavedTitle": "Monthly Saved Waste",
+    "netPressureTitle": "Net Kitchen Pressure",
     "preventedWasteTitle": "Prevented Waste",
-    "preventedWasteDescription": "Value of consumed ingredients from cooked planner meals"
+    "preventedWasteDescription": "Symbolic savings compared to ordering out",
+    "modelTitle": "Waste Prevention Model",
+    "modelDescription": "Saved value is estimated by multiplying cooked plate cost with a gain coefficient.",
+    "multiplierLabel": "Gain Multiplier",
+    "coverageRatioLabel": "Recovery Ratio"
   }
 }

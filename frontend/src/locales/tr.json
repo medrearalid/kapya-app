@@ -230,10 +230,22 @@
   },
   "wallet": {
     "badge": "Finans",
-    "title": "Cüzdan",
+    "title": "Mutfak Enflasyon Dashboard",
+    "subtitle": "Mutfak stokunun finansal etkisini, pişirilen tarif maliyetlerini ve israf önleme kazanımını tek ekranda izle.",
+    "inventoryCostTitle": "Toplam Envanter Değeri",
+    "inventoryCostDescription": "Stoktaki ürünlerin birim maliyet x miktar toplamı",
+    "totalConsumedTitle": "Pişirilen Toplam Tutar",
+    "totalConsumedDescription": "Tamamlanan öğünlerde tüketilen tabak maliyeti",
     "monthlySpendTitle": "Bu Ay Mutfak Harcaması",
     "thisMonthLabel": "Fişlerden eklenen toplam tutar",
+    "monthlyPanelTitle": "Aylık Finans Basıncı",
+    "monthlySavedTitle": "Bu Ay Kurtarılan İsraf",
+    "netPressureTitle": "Net Mutfak Basıncı",
     "preventedWasteTitle": "Önlenen İsraf",
-    "preventedWasteDescription": "Planlayıcıda pişirilen öğünlerin stok karşılığı"
+    "preventedWasteDescription": "Pişirme sayesinde dışarıdan siparişe göre cepte kalan sembolik tutar",
+    "modelTitle": "İsraf Önleme Modeli",
+    "modelDescription": "Kurtarılan değer, pişirilen tabak maliyetinin katsayıyla büyütülmesiyle hesaplanır.",
+    "multiplierLabel": "Kazanç Çarpanı",
+    "coverageRatioLabel": "Geri Kazanım Oranı"
   }
 }
