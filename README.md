@@ -10,8 +10,11 @@
 
 | 🏡 Ana Sayfa & Mutfak Stoğu | 🍳 Şef Sekmesi (AI Agent) | 💳 Cüzdan (Bento Financial Dashboard) |
 | :---: | :---: | :---: |
-| ![Ana Sayfa](x) | ![Şef Sekmesi](x) | ![Cüzdan Sekmesi](x) |
-| *Gelişmiş Mutfak Envanteri ve Ürün Yönetimi* | *Agent Plan Loader UI ile Sıfır İsraf Odaklı Tarif Motoru* | *Kurtarılan İsraf ve Anlık Enflasyon Metrikleri* |
+| ![Ana Sayfa](.github/assets/main.png) | ![Şef Sekmesi](.github/assets/sef.png) | ![Cüzdan Sekmesi](.github/assets/cuzdan.png) |
+| *Tarif Envanteri ve Kiler Yönetimi* | *Yapay Zeka Tarif Önerileri* | *Mutfak Enflasyon Dashboard* |
+| **📅 Öğün Planlayıcı** | **⚙️ Ayarlar** | |
+| ![Planlayıcı](.github/assets/planner.png) | ![Ayarlar](.github/assets/settings.png) | |
+| *Haftalık Öğün Planlama ve Sağlık Özeti* | *Bütçe Profili ve Uygulama Ayarları* | |
 
 
 ---
