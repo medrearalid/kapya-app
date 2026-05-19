@@ -1,58 +1,59 @@
 # Kapya
 
-Kapya, mutfak stok yonetimi, yemek planlama ve AI destekli tarif uretimini tek bir mobil-oncelikli deneyimde birlestiren bir web uygulamasidir. Proje, gida israfini azaltmaya odaklanir ve kullanicinin dolabindaki urunleri merkeze alarak uygulanabilir yemek onerileri sunar.
+Kapya; mutfak stok yönetimi, yemek planlama ve yapay zeka destekli tarif üretimini tek bir mobil öncelikli (Mobile-First) deneyimde birleştiren bir web uygulamasıdır. Proje, gıda israfını en aza indirmeyi hedefler ve kullanıcının dolabındaki mevcut ürünleri merkeze alarak pratik ve bütçeye uygun yemek önerileri sunar.
 
 ## Neden Kapya?
 
-- Dolaptaki urunleri ve son tuketim tarihlerini tek ekranda takip etmeyi kolaylastirir.
-- Fis gorselinden gida urunlerini ayiklayip otomatik stok guncellemesini destekler.
-- Butce profiline gore 3 farkli tarif onerisi uretir.
-- Tarifleri ogle/aksam planina ekleyerek haftalik duzeni guclendirir.
-- LocalStorage tabanli kalicilik sayesinde kullanici deneyimini hizlandirir.
+- Dolaptaki ürünleri ve tahmini son tüketim tarihlerini tek bir şık arayüzde takip etmeyi kolaylaştırır.
+- Alışveriş fişi görselinden gıda ürünlerini otomatik olarak ayıklayıp mutfak envanterini günceller.
+- Seçilen bütçe profiline göre kişiselleştirilmiş ve israfı azaltan yemek tarifleri üretir.
+- Üretilen tarifleri öğle/akşam planlarına ekleyerek haftalık beslenme düzenini güçlendirir.
+- LocalStorage tabanlı kalıcı veri saklama yaklaşımı sayesinde yüksek hızlı ve kesintisiz bir kullanıcı deneyimi sunar.
 
-## Ozellikler
+## Özellikler
 
-### 1) Kiler (Pantry) Yonetimi
-- Urun ekleme, guncelleme, birlestirme ve silme
-- Birim bazli takip: adet, gram, kilogram, paket, bag, litre, mililitre
-- Tahmini raf omru bitis tarihine gore stok gorunurlugu
+### 1) Kiler (Pantry) Yönetimi ve Akıllı Fiş Entegrasyonu
+- Ürün ekleme, güncelleme, akıllı miktar birleştirme ve silme işlemleri.
+- Birim bazlı stok takibi: adet, gram, kilogram, paket, bağ, litre, mililitre.
+- Tahmini raf ömrü bitiş tarihine göre "Acil Tüketim" ve "Aktif Stok" sınıflandırması.
+- **Otomatik Finansal Senkronizasyon:** Fiş fotoğrafından başarıyla ayıklanan tüm ürünlerin parasal değerleri, anında mutfak envanter değerine (`Cüzdan` sekmesindeki harcamalara) otomatik olarak yansıtılır.
 
-### 2) Fis Analizi (AI Vision)
-- Fis gorselini base64 veya data URL formatinda alir
-- Once gorselin fis olup olmadigini siniflandirir
-- Sonra sadece uygun gida urunlerini JSON formatinda cikarir
-- Hazir tuketime uygun urunleri ve gida disi kalemleri filtreler
+### 2) Fiş Analizi (AI Vision)
+- Fiş görselini base64 veya veri URL'si formatında işleme.
+- Görselin bir alışveriş fişi olup olmadığını yapay zeka ile otomatik doğrulama.
+- Yalnızca yenilebilir gıda ürünlerini, miktarlarını ve birim fiyatlarını JSON formatında ayıklama.
+- Hazır tüketime uygun ürünleri ve gıda dışı (temizlik, kozmetik vb.) kalemleri akıllıca filtreleme.
 
-### 3) Israf Azaltan Tarif Ajanı
-- Butce profili + mevcut stok + acil urunler girdisiyle calisir
-- Tam olarak 3 tarif dondurur
-- Her tarifte eslesen ve eksik malzemeleri ayristirir
-- Tarif gorseli icin coklu fallback stratejisi uygular
+### 3) İsraf Azaltan Şef & Akıllı Tarif Ajanı
+- Bütçe profili (Öğrenci, Aile, Lüks) + mevcut stok + acil tüketilmesi gereken ürünler girdisiyle çalışır.
+- **Geleneksel Tarif İsimleri:** Yapay zeka tarafından oluşturulan tarif adları Türk mutfağına en uygun, sade ve yaygın isimler olacak şekilde optimize edilmiştir (örn: "Pirinç Pilavı", "Kuru Fasulye", "Menemen", "İzmir Köfte"). "Tava Sürprizi" gibi yapay isimler engellenmiştir.
+- **Dinamik Porsiyon & Miktar Ölçekleme:** Tarif detay ekranından porsiyon sayısı değiştirildiğinde, tarifin malzeme miktarları (adet, gram vb.) formülsel olarak anında ve dinamik olarak güncellenir.
+- **Yenisini Üret & Silme:** Beğenilmeyen bir tarif detay sayfasından "Yenisini Üret" seçeneğiyle kütüphaneden silinir ve arka planda mutfak stoğuna uygun, çakışmayan yepyeni bir alternatif tarif ajan tarafından canlandırılan cam yükleme ekranıyla birlikte üretilir.
 
-### 4) Yemek Planlayici
-- Tarifleri ogle/aksam olarak takvime ekleme
-- Porsiyon boyutu secimi
-- Tamamlandi/tamamlanmadi durum takibi
+### 4) Yemek Planlayıcı
+- Üretilen tarifleri öğle/akşam olarak takvime ekleme.
+- Öğün tamamlandığında stoktaki malzemelerin miktarlarını otomatik olarak düşme.
+- Tamamlandı/tamamlanmadı durum takibi.
 
-### 5) UX Katmani
-- Mobile-first arayuz
-- Karanlik/aydinlik tema
-- TR/EN dil destegi
-- Onboarding akisi ve global hata gosterimi
+### 5) UX Katmanı ve Premium Arayüz
+- **Mobil Öncelikli (Mobile-First) Premium Arayüz:** Modern glassmorphism kart tasarımları, pürüzsüz animasyonlar (`Framer Motion`) ve üst segment renk paletleri.
+- **Yenilenen Kart Tabanlı Ayarlar:** Bütçe profilinizi, sistem dilini (TR/EN) ve geliştirici modunu kontrol edebileceğiniz şık kart tasarımları.
+- **Zengin Demo Envanteri:** Test sürecini kolaylaştırmak amacıyla tek tıkla mutfak envanterini dolduran 15 adet kapsamlı Türk mutfağı temel malzemesi entegre edilmiştir.
+- **Aydınlık Tema Kilidi (Enforce Light Mode):** Tasarımsal bütünlüğü korumak için karanlık tema geçici olarak devre dışı bırakılmış ve kararlı aydınlık temaya kilitlenmiştir.
 
 ## Mimari
 
-Proje monorepo yapisindadir:
+Proje monorepo yapısındadır:
 
-- frontend: React + Vite istemci uygulamasi
-- backend: Express tabanli API katmani
+- **frontend:** React + Vite tabanlı mobil öncelikli istemci uygulaması.
+- **backend:** Express tabanlı API ve yapay zeka katmanı.
 
-Veri saklama yaklasimi:
+Veri saklama yaklaşımı:
 
-- Frontend uygulama durumu: LocalStorage (Zustand persist)
-- Backend gecici isleme: in-memory is akislari
+- **Frontend Uygulama Durumu:** LocalStorage (Zustand persist ile otomatik senkronizasyon).
+- **Backend Geçici İşleme:** Bellek içi (in-memory) iş akışları.
 
-## Teknoloji Yigini
+## Teknoloji Yığını
 
 ### Frontend
 - React 19
@@ -60,45 +61,45 @@ Veri saklama yaklasimi:
 - Tailwind CSS 3
 - Zustand 5
 - React Router 7
-- i18next
-- Framer Motion
+- i18next (Çoklu dil desteği)
+- Framer Motion (Mikro etkileşimler ve animasyonlar)
 
 ### Backend
 - Node.js + Express 5
-- @google/genai
+- @google/genai (Resmi Gemini SDK)
 - @langchain/google-genai
 - dotenv
 - cors
 
-## Dizin Yapisi
+## Dizin Yapısı
 
 ```text
 kapya-app/
   frontend/
     src/
-      components/
-      pages/
-      services/
-      store/
-      utils/
+      components/    # Ortak UI bileşenleri
+      pages/         # Sayfa bileşenleri
+      services/      # API istek yönetimleri
+      store/         # Zustand durum yönetimleri
+      utils/         # Yardımcı fonksiyonlar
   backend/
     src/
-      controllers/
-      routes/
-      services/
-      scripts/
+      controllers/   # İstek karşılayıcılar
+      routes/        # API yönlendirmeleri
+      services/      # Gemini API ve iş mantığı servisleri
+      scripts/       # Yardımcı test araçları
 ```
 
 ## Gereksinimler
 
-- Node.js 20+
-- npm 10+
-- Google Gemini API anahtari
+- Node.js 20 veya üzeri
+- npm 10 veya üzeri
+- Google Gemini API Anahtarı
 
 ## Kurulum
 
-1. Depoyu klonlayin.
-2. Bagimliliklari yukleyin:
+1. Depoyu yerel bilgisayarınıza klonlayın.
+2. Gerekli bağımlılıkları yükleyin:
 
 ```bash
 cd backend
@@ -108,23 +109,23 @@ cd ../frontend
 npm install
 ```
 
-## Ortam Degiskenleri
+## Ortam Değişkenleri
 
 ### backend/.env
 
 ```env
-# API
+# API Ayarları
 PORT=3001
-GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=api_anahtarinizi_buraya_yazin
 
-# Opsiyonel model override ayarlari
+# Opsiyonel Model Override Ayarları
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_VISION_MODEL=gemini-2.5-flash-lite
 GEMINI_RECEIPT_CLASSIFIER_MODEL=gemini-2.5-flash-lite
 GEMINI_TEXT_MODEL=gemini-3.1-flash-lite
 GEMINI_IMAGE_MODEL=gemini-3.1-flash-image-preview
 
-# Opsiyonel harici gorsel servisi
+# Opsiyonel Harici Görsel Servisi
 NANO_BANANA_API_URL=
 NANO_BANANA_API_KEY=
 ```
@@ -135,53 +136,55 @@ NANO_BANANA_API_KEY=
 VITE_API_BASE_URL=http://localhost:3001
 ```
 
-## Gelistirme Modunda Calistirma
+## Geliştirme Modunda Çalıştırma
 
-Backend:
+Aşağıdaki komutları ayrı terminal pencerelerinde çalıştırarak yerel sunucuları başlatın.
+
+### Backend Sunucusu:
 
 ```bash
 cd backend
 npm run dev
 ```
 
-Frontend:
+### Frontend Sunucusu:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-## Production Build
+## Canlı Derleme (Production Build)
 
-Frontend build:
+İstemci uygulaması derleme:
 
 ```bash
 cd frontend
 npm run build
 ```
 
-Backend production baslatma:
+Backend sunucusunu production modunda başlatma:
 
 ```bash
 cd backend
 npm start
 ```
 
-## API Ozeti
+## API Özeti
 
-### Health Check
-- Method: GET
-- Path: /health
-- Response:
+### Sağlık Kontrolü (Health Check)
+- **Yöntem:** GET
+- **Adres:** `/health`
+- **Yanıt Örneği:**
 
 ```json
 { "status": "ok" }
 ```
 
-### Fis Analizi
-- Method: POST
-- Path: /api/receipts/analyze
-- Request body:
+### Fiş Analizi
+- **Yöntem:** POST
+- **Adres:** `/api/receipts/analyze`
+- **İstek Gövdesi:**
 
 ```json
 {
@@ -189,7 +192,7 @@ npm start
 }
 ```
 
-- Basarili response:
+- **Başarılı Yanıt Örneği:**
 
 ```json
 {
@@ -197,44 +200,44 @@ npm start
   "data": [
     {
       "name": "Yumurta",
-      "quantity": 10,
+      "quantity": 15,
       "unit": "adet",
-      "estimatedShelfLifeDays": 9
+      "estimatedShelfLifeDays": 15
     }
   ]
 }
 ```
 
-### Israf Azaltan Tarif Uretimi
-- Method: POST
-- Path: /api/ai/recipes/waste-saver
-- Request body:
+### İsraf Önleyici Tarif Üretimi
+- **Yöntem:** POST
+- **Adres:** `/api/ai/recipes/waste-saver`
+- **İstek Gövdesi:**
 
 ```json
 {
-  "budgetProfile": "ogrenci",
+  "budgetProfile": "öğrenci",
   "pantryStock": [
     {
       "name": "Yumurta",
-      "quantity": 4,
+      "quantity": 15,
       "unit": "adet",
-      "estimatedShelfLifeEndDate": "2026-05-14"
+      "estimatedShelfLifeEndDate": "2026-06-03"
     }
   ],
   "urgentProducts": [
     {
       "name": "Yumurta",
-      "quantity": 4,
+      "quantity": 15,
       "unit": "adet",
-      "estimatedShelfLifeEndDate": "2026-05-14"
+      "estimatedShelfLifeEndDate": "2026-06-03"
     }
   ],
-  "agentInstruction": "Protein agirlikli secenekler",
+  "agentInstruction": "Protein ağırlıklı seçenekler",
   "requestMode": "default"
 }
 ```
 
-- Basarili response:
+- **Başarılı Yanıt Örneği:**
 
 ```json
 {
@@ -243,49 +246,39 @@ npm start
     "tarifler": [
       {
         "tarifAdi": "Menemen",
-        "kisaAciklama": "...",
-        "tahminiSure": "20 dakika",
+        "kisaAciklama": "Dolaptaki taze domates, biber ve yumurta ile hazırlanan geleneksel kahvaltı klasiği.",
+        "tahminiSure": "15 dk",
         "goruntuUrl": "data:image/...",
         "matchedIngredients": [
-          { "isim": "Yumurta", "miktar": "4", "birim": "adet" }
+          { "isim": "Yumurta", "miktar": "3", "birim": "adet" }
         ],
         "missingIngredients": [
-          { "isim": "zeytinyagi", "miktar": "1", "birim": "yemek kasigi" }
+          { "isim": "Domates", "miktar": "2", "birim": "adet" }
         ],
-        "pisirmeAdimlari": ["Adim 1", "Adim 2"]
+        "pisirmeAdimlari": [
+          "Biberleri ve domatesleri soteleyin.",
+          "Yumurtaları ekleyip karıştırın."
+        ]
       }
     ]
   }
 }
 ```
 
-## Smoke Test
+## Duman Testi (Smoke Test)
 
-Backend smoke test script'i:
+Backend uç noktalarını doğrulamak için otomatik duman testini çalıştırabilirsiniz:
 
 ```bash
 cd backend
 npm run test:smoke
 ```
 
-Opsiyonel degiskenler:
+## Kod Kalitesi ve İlkeler
 
-- TEST_API_BASE_URL: Varsayilan deger http://localhost:5000
-- RECEIPT_IMAGE_PATH: Testte kullanilacak yerel fis gorseli yolu
-
-## Kod Kalitesi ve Ilkeler
-
-- Bilesen/servis ayrimi ile SRP odakli yapi
-- Controller katmaninda yalnizca request/response sorumlulugu
-- Servis katmaninda AI entegrasyonu ve veri normalizasyonu
-- Uretim hatalarinda tutarli JSON error cevabi
-
-## Yol Haritasi (Kisa)
-
-- Unit ve integration test kapsamini artirma
-- Kimlik dogrulama ve kullanici bazli veri ayrimi
-- Tarif kalori/makro besin degerlerinin eklenmesi
-- AI maliyet optimizasyonu ve cache stratejileri
+- **SRP (Tek Sorumluluk Prensibi):** Görünüm katmanı (UI) ile iş mantığı (business logic) kesin olarak ayrılmıştır.
+- **Katmanlı Mimari:** İstek karşılayıcılar (controllers) sadece yönlendirme ve HTTP katmanını yönetirken, yapay zeka ve stok algoritmaları bağımsız servis dosyalarında işlenir.
+- **Hata Yönetimi:** Tüm operasyonel hatalar frontend ve backend katmanlarında yakalanarak kullanıcı dostu toast bildirimlerine dönüştürülür.
 
 ## Lisans
 
