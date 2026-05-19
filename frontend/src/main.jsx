@@ -1,8 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import './utils/i18n'
+import ErrorBoundary from './components/error-boundary'
 import RootLayout from './components/root-layout'
 import GlobalErrorDisplay from './components/GlobalErrorDisplay'
 import PantryPage from './pages/pantry-page'
@@ -11,6 +13,8 @@ import RecipeDetailPage from './pages/recipe-detail-page'
 import RecipePage from './pages/recipe-page'
 import SettingsPage from './pages/settings-page'
 import WalletPage from './pages/wallet-page'
+
+registerSW({ immediate: true })
 
 const router = createBrowserRouter([
   {
@@ -52,6 +56,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <ErrorBoundary>
+      <RouterProvider router={router} />
+    </ErrorBoundary>
   </StrictMode>,
 )

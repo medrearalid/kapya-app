@@ -294,18 +294,49 @@ export const useRecipeStore = create(
         return String(get().imageCacheByRecipeName?.[recipeNameKey] ?? '').trim()
       },
 
-      toggleFavorite: (recipeId) =>
-        set((state) => ({
-          savedRecipes: state.savedRecipes.map((recipe) =>
-            recipe.id === recipeId
-              ? {
-                  ...recipe,
-                  isFavorite: !recipe.isFavorite,
-                  updatedAt: Date.now(),
-                }
-              : recipe,
-          ),
-        })),
+      toggleFavorite: (recipeRef) =>
+        set((state) => {
+          const targetId = normalizeText(recipeRef?.id ?? recipeRef)
+          const targetName = normalizeRecipeNameKey(recipeRef?.isim ?? recipeRef?.name)
+          const hasIdMatch =
+            Boolean(targetId) &&
+            state.savedRecipes.some((recipe) => normalizeText(recipe?.id) === targetId)
+
+          return {
+            savedRecipes: state.savedRecipes.map((recipe) => {
+              const isMatch = hasIdMatch
+                ? normalizeText(recipe?.id) === targetId
+                : Boolean(targetName) && normalizeRecipeNameKey(recipe?.isim) === targetName
+
+              if (!isMatch) {
+                return recipe
+              }
+
+              return {
+                ...recipe,
+                isFavorite: !recipe.isFavorite,
+                updatedAt: Date.now(),
+              }
+            }),
+          }
+        }),
+
+      deleteRecipe: (recipeId) =>
+        set((state) => {
+          const targetId = normalizeText(recipeId)
+          if (!targetId) {
+            return state
+          }
+
+          const nextRecipes = state.savedRecipes.filter(
+            (recipe) => normalizeText(recipe?.id) !== targetId,
+          )
+
+          return {
+            savedRecipes: nextRecipes,
+            imageCacheByRecipeName: buildImageCacheFromRecipes(nextRecipes),
+          }
+        }),
 
       clearRecipeMemory: () =>
         set({

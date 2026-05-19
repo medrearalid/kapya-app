@@ -1,6 +1,6 @@
 {
   "navigation": {
-    "pantry": "Kitchen",
+    "pantry": "Home",
     "recipes": "Chef",
     "planner": "Planner",
     "settings": "Settings",
@@ -25,6 +25,23 @@
   "pantry": {
     "badge": "Kitchen",
     "title": "Kitchen Stocks",
+    "recipeInventory": {
+      "headline": "Recipe Production Inventory",
+      "subtitle": "Generate recipes from your current stock, use critical products in time, and reduce waste.",
+      "promptPlaceholder": "What do you want to cook? Ex: olive oil green beans",
+      "generateButton": "Generate Recipe",
+      "luckyButton": "Surprise Recipe",
+      "guidedButton": "Guided Pick",
+      "validationPrompt": "Type a meal name or choose options in the wizard.",
+      "successToast": "Recipe is ready. Redirecting to details.",
+      "defaultError": "A problem occurred while generating recipe.",
+      "activeStock": "Active Stock",
+      "activeStockDescription": "Products ready to use",
+      "urgentStock": "Urgent Consumption",
+      "urgentStockDescription": "Should be used within 2 days",
+      "inventoryValue": "Inventory Value",
+      "inventoryValueDescription": "Current total stock cost"
+    },
     "addProductTitle": "Quick Add",
     "namePlaceholder": "Product name",
     "quantityPlaceholder": "Quantity",
@@ -47,11 +64,15 @@
       "var": "in stock"
     },
     "emptyState": "Your kitchen stock is empty right now.",
+    "emptyStateTitle": "You have not added kitchen stock yet",
+    "emptyStateDescription": "Your basket looks empty. Use quick add or receipt scan to load your first products.",
     "deleteProductAria": "Delete {{name}}",
     "decreaseQuantityAria": "Decrease quantity of {{name}}",
     "increaseQuantityAria": "Increase quantity of {{name}}",
     "receipt": {
       "fabButton": "Add from Receipt",
+      "quickAddButton": "Add Products from Receipt Photo",
+      "quickAddDescription": "Snap your market receipt and let AI detect items before adding them to kitchen stock.",
       "loadingMessage": "Analyzing your receipt with AI...",
       "networkError": "Unable to reach the server. Check that backend is running and API URL is correct.",
       "defaultError": "A problem occurred while analyzing the receipt.",
@@ -77,7 +98,7 @@
     "guidedAssistantCardDescription": "Choose category, multi-focus ingredients, cooking technique, and diet goal in 4 steps.",
     "guidedAssistantTitle": "Step-by-Step Chef Assistant",
     "guidedStep1Title": "1/4 Choose recipe category",
-    "guidedStep2Title": "2/4 Choose focus ingredients",
+    "guidedStep2Title": "2/4 Choose focus ingredients (optional)",
     "guidedStep3Title": "3/4 Choose cooking technique",
     "guidedStep4Title": "4/4 Choose diet goal",
     "guidedCategoryMainDish": "Main Dish",
@@ -88,17 +109,19 @@
     "guidedTechniquePanStove": "Pan / Stove",
     "guidedTechniquePot": "Pot",
     "guidedTechniqueNoCook": "No-Cook / Raw",
+    "guidedTechniqueAny": "No Preference",
     "guidedDietHighProtein": "High Protein",
     "guidedDietLowCarb": "Low Carb",
     "guidedDietVegetableOnly": "Vegetable Only",
     "guidedDietAny": "No Preference",
+    "guidedOptionalStepLabel": "Optional Step",
     "guidedBackButton": "Back",
     "guidedNextButton": "Next",
     "guidedCreateButton": "Create Recipe",
     "guidedValidationCategory": "Select a category to continue.",
     "guidedValidationTechnique": "Choose a cooking technique to continue.",
     "guidedValidationDiet": "Choose a diet goal before creating the recipe.",
-    "guidedFocusMultiHint": "You can pick multiple focus ingredients. Tap again to remove.",
+    "guidedFocusMultiHint": "You can skip this step. Or pick multiple focus ingredients and tap again to remove.",
     "focusIngredientsCardTitle": "Focused Ingredients",
     "focusIngredientsCardDescription": "Pick from your kitchen stock and center the recipe around them.",
     "filtersCardTitle": "Custom Filters",
@@ -134,6 +157,18 @@
     "favoriteButton": "Add to Favorites",
     "favoritedButton": "Favorited",
     "favoriteSavedToast": "Recipe added to favorites.",
+    "favoriteRemovedToast": "Recipe removed from favorites.",
+    "favoriteAddAria": "Add {{name}} to favorites",
+    "favoriteRemoveAria": "Remove {{name}} from favorites",
+    "deleteRecipeAria": "Delete {{name}} recipe",
+    "deletingAndReplacing": "Deleting recipe and generating a new one...",
+    "replacementGenerated": "New alternative recipe successfully added to the library!",
+    "replacementFailed": "Failed to generate new recipe, but the recipe was deleted.",
+    "closeDetailAria": "Close recipe detail",
+    "filterAll": "All",
+    "filterFavorites": "Favorites ({{count}})",
+    "favoritesEmptyTitle": "No favorite recipe yet",
+    "favoritesEmptyDescription": "Tap the heart icon to save recipes to your favorites.",
     "summaryTime": "Time",
     "summaryCalories": "Calories",
     "summaryDifficulty": "Difficulty",
@@ -153,6 +188,8 @@
     "matchedCountBadge": "In stock {{count}}",
     "missingCountBadge": "Missing {{count}}",
     "emptyTitle": "Recipe list is empty",
+    "emptyLibraryTitle": "Your chef library is still empty",
+    "emptyLibraryDescription": "Generate your first suggestion from Smart Chef and start building your recipe archive.",
     "emptyDescription": "Create new suggestions from the Kitchen page.",
     "portionSize": "{{count}} servings",
     "decreasePortion": "Decrease portion",
@@ -177,7 +214,70 @@
   },
   "planner": {
     "badge": "Planner",
+    "betaLabel": "Beta",
     "title": "Meal Planner",
+    "betaWarningTitle": "Planner is in beta",
+    "betaWarningDescription": "Some auto-planning flows and sync behavior are still being stabilized. Please review generated results before continuing.",
+    "agentPlanBadge": "Roadmap",
+    "agentPlanTitle": "Agent Plan Board",
+    "agentPlanDescription": "Track tasks and subtasks in an interactive board.",
+    "agentPlanActiveCount": "{{count}} process running",
+    "agentPlanLastLogSummary": "Last log summary: {{summary}}",
+    "agentPlanLastLogFallback": "No log yet",
+    "agentPlan": {
+      "status": {
+        "completed": "Completed",
+        "inProgress": "In Progress",
+        "pending": "Pending",
+        "needHelp": "Need Help",
+        "failed": "Failed"
+      },
+      "task": {
+        "insight": {
+          "title": "Agent Insight Stream",
+          "description": "Planner and wallet analysis flows are tracked live."
+        },
+        "mealSummary": {
+          "title": "Meal Execution Summary",
+          "description": "Runs in real time synchronized with planner data."
+        },
+        "upcoming": {
+          "title": "Upcoming Meal Slots",
+          "description": "Next meal slots and their states."
+        }
+      },
+      "subtask": {
+        "plannerInsight": {
+          "title": "Planner Insight"
+        },
+        "walletInsight": {
+          "title": "Wallet Insight"
+        },
+        "activeProcess": {
+          "title": "Active Agent Process",
+          "description": "{{count}} process running"
+        },
+        "noEvent": {
+          "description": "No stream event yet."
+        },
+        "totalMeals": {
+          "title": "Total Planned Meals",
+          "description": "{{count}} meals"
+        },
+        "completedMeals": {
+          "title": "Completed Meals",
+          "description": "{{count}} meals"
+        },
+        "pendingMeals": {
+          "title": "Pending Meals",
+          "description": "{{count}} meals"
+        },
+        "noMeal": {
+          "title": "No planned meals yet",
+          "description": "No planned meals yet. Add one from recipe cards with 'Plan This Recipe'."
+        }
+      }
+    },
     "emptyDescription": "No planned meals yet. Add one from recipe cards with 'Plan This Recipe'.",
     "today": "Today",
     "tomorrow": "Tomorrow",
@@ -225,6 +325,9 @@
     "clearRecipeMemorySuccess": "Recipe memory cleared.",
     "developerModeLabel": "Developer Mode (Agentic Debug)",
     "developerModeDescription": "Toggle technical A2A logs and the self-correction simulation.",
+    "loadDemoData": "Load Demo Data",
+    "demoDataConfirm": "Current kitchen and planner data will be replaced with a demo scenario. Do you want to continue?",
+    "demoDataSuccess": "Demo data loaded. Presentation flow is ready.",
     "resetData": "Reset All Data",
     "resetDataConfirm": "All application data will be reset. Do you want to continue?"
   },
@@ -246,6 +349,8 @@
     "modelTitle": "Waste Prevention Model",
     "modelDescription": "Saved value is estimated by multiplying cooked plate cost with a gain coefficient.",
     "multiplierLabel": "Gain Multiplier",
-    "coverageRatioLabel": "Recovery Ratio"
+    "coverageRatioLabel": "Recovery Ratio",
+    "emptyStateTitle": "No spending data found",
+    "emptyStateDescription": "Wallet analytics are waiting for data. Load demo data or start kitchen activity to populate this view."
   }
 }

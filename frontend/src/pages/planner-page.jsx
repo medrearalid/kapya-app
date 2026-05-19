@@ -1,4 +1,4 @@
-import { LoaderCircle, Sparkles, Wand2 } from 'lucide-react'
+import { AlertTriangle, LoaderCircle, Sparkles, Wand2 } from 'lucide-react'
 import PropTypes from 'prop-types'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -121,7 +121,7 @@ function AutoPlanSheet({ isOpen, dayCount, personCount, onDayCountChange, onPers
     >
       <div
         className={[
-          'glass-panel mx-auto w-full max-w-md border border-white/60 bg-white/95 p-4 dark:border-slate-700/60 dark:bg-slate-900/95',
+          'feature-card mx-auto w-full max-w-md border border-black/10 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-900/95',
           isDesktopViewport ? 'rounded-3xl' : 'rounded-2xl',
         ].join(' ')}
       >
@@ -140,7 +140,7 @@ function AutoPlanSheet({ isOpen, dayCount, personCount, onDayCountChange, onPers
               max="7"
               value={dayCount}
               onChange={(event) => onDayCountChange(event.target.value)}
-              className="w-full rounded-xl border border-white/55 bg-white/80 px-3 py-2 text-sm outline-none ring-kapya-300 focus:ring-2 dark:border-slate-700 dark:bg-slate-800"
+              className="field-input"
             />
           </label>
 
@@ -154,7 +154,7 @@ function AutoPlanSheet({ isOpen, dayCount, personCount, onDayCountChange, onPers
               max="10"
               value={personCount}
               onChange={(event) => onPersonCountChange(event.target.value)}
-              className="w-full rounded-xl border border-white/55 bg-white/80 px-3 py-2 text-sm outline-none ring-kapya-300 focus:ring-2 dark:border-slate-700 dark:bg-slate-800"
+              className="field-input"
             />
           </label>
         </div>
@@ -163,14 +163,14 @@ function AutoPlanSheet({ isOpen, dayCount, personCount, onDayCountChange, onPers
           <TapButton
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            className="soft-highlight-btn px-4 py-2.5 text-sm font-semibold"
           >
             {t('planner.cancelButton')}
           </TapButton>
           <TapButton
             type="button"
             onClick={onConfirm}
-            className="rounded-xl bg-kapya-600 px-4 py-2.5 text-sm font-semibold text-white"
+            className="primary-action-btn px-4 py-2.5 text-sm font-semibold"
           >
             {t('planner.autoPlanConfirmButton')}
           </TapButton>
@@ -208,6 +208,8 @@ function PlannerPage() {
   const saveRecipe = useRecipeStore((state) => state.saveRecipe)
 
   const trackRecipeCooked = useBehaviorStore((s) => s.trackRecipeCooked)
+  const startAgentProcess = useBehaviorStore((state) => state.startAgentProcess)
+  const finishAgentProcess = useBehaviorStore((state) => state.finishAgentProcess)
 
   const [isAutoPlanSheetOpen, setIsAutoPlanSheetOpen] = useState(false)
   const [autoPlanDayCount, setAutoPlanDayCount] = useState(3)
@@ -311,6 +313,7 @@ function PlannerPage() {
     }
 
     setLoadingSlotKey(slotKey)
+    startAgentProcess()
 
     try {
       const recipe = await generateRecipeByName({
@@ -338,6 +341,7 @@ function PlannerPage() {
       showToast(t('planner.chefSuggestionError'))
     } finally {
       setLoadingSlotKey('')
+      finishAgentProcess()
     }
   }
 
@@ -415,13 +419,18 @@ function PlannerPage() {
   }
 
   return (
-    <section className="space-y-4 pb-20 md:pb-6">
+    <section className="space-y-6 pb-20 md:pb-6">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sand-700 dark:text-slate-400">
-            {t('planner.badge')}
-          </p>
-          <h1 className="heading-display mt-2 text-3xl font-semibold text-sand-900 dark:text-slate-100">
+          <div className="inline-flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#4b4b4b] dark:text-slate-400">
+              {t('planner.badge')}
+            </p>
+            <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-800 dark:border-amber-700/70 dark:bg-amber-900/35 dark:text-amber-200">
+              {t('planner.betaLabel')}
+            </span>
+          </div>
+          <h1 className="heading-display mt-2 text-3xl font-semibold text-[#050505] dark:text-slate-100">
             {t('planner.title')}
           </h1>
         </div>
@@ -429,12 +438,25 @@ function PlannerPage() {
         <TapButton
           type="button"
           onClick={() => setIsAutoPlanSheetOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-kapya-600 px-3 py-2 text-xs font-semibold text-white"
+          className="primary-action-btn inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold"
         >
           <Wand2 className="h-4 w-4" aria-hidden="true" />
           {t('planner.autoPlanButton')}
         </TapButton>
       </header>
+
+      <article className="feature-card flex items-start gap-3 border border-amber-300/70 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-900/20">
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-800/40 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+        </span>
+
+        <div>
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">{t('planner.betaWarningTitle')}</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+            {t('planner.betaWarningDescription')}
+          </p>
+        </div>
+      </article>
 
       <HealthSummaryCard plannedMeals={plannedMeals} />
 
@@ -450,8 +472,8 @@ function PlannerPage() {
                 className={[
                   'rounded-full border px-3.5 py-1.5 text-xs font-semibold transition',
                   isSelected
-                    ? 'border-kapya-500 bg-kapya-600 text-white shadow-md shadow-kapya-700/15'
-                    : 'border-slate-200/80 bg-slate-100/75 text-slate-700 dark:border-slate-600/80 dark:bg-slate-800/70 dark:text-slate-200',
+                    ? 'border-[#171717] bg-[#171717] text-white shadow-soft'
+                    : 'border-black/10 bg-white text-[#4b4b4b] dark:border-slate-600/80 dark:bg-slate-800/70 dark:text-slate-200',
                 ].join(' ')}
               >
                 {getDayPillLabel(dayKey)}
@@ -461,7 +483,7 @@ function PlannerPage() {
         </div>
       </div>
 
-      <article className="glass-panel soft-card rounded-2xl p-4">
+      <article className="feature-card p-4">
         {mealTypeOrder.map((mealType) => {
           const plannedMeal = mealByType[mealType]
           const slotKey = toSlotKey(activeSelectedDay, mealType)
@@ -469,7 +491,7 @@ function PlannerPage() {
 
           return (
             <div key={slotKey} className="mt-3 first:mt-0">
-              <p className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <p className="mb-2 text-sm font-semibold text-[#050505] dark:text-slate-100">
                 {getMealTypeLabel(mealType, t)}
               </p>
 
@@ -481,8 +503,8 @@ function PlannerPage() {
                   onRemoveMeal={removePlannedMeal}
                 />
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-3 dark:border-slate-600 dark:bg-slate-900/50">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{t('planner.emptySlot')}</p>
+                <div className="rounded-xl border border-dashed border-black/20 bg-[#f7f4f0] p-3 dark:border-slate-600 dark:bg-slate-900/50">
+                  <p className="text-xs font-medium text-[#737373] dark:text-slate-400">{t('planner.emptySlot')}</p>
                   <div className="mt-2 flex items-center gap-2">
                     <TapButton
                       type="button"
@@ -494,7 +516,7 @@ function PlannerPage() {
                         })
                       }
                       disabled={isLoadingSlot}
-                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-70 dark:bg-kapya-700"
+                      className="primary-action-btn inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold disabled:opacity-70"
                     >
                       {isLoadingSlot ? (
                         <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -514,7 +536,7 @@ function PlannerPage() {
                         })
                       }
                       disabled={isLoadingSlot}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-bold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                      className="soft-highlight-btn inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold"
                     >
                       +
                     </TapButton>

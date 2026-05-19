@@ -39,6 +39,9 @@ const addUnique = (list, item, maxSize) => {
   return [name, ...filtered].slice(0, maxSize)
 }
 
+const increaseProcessCount = (count) => Math.max(0, Number(count) || 0) + 1
+const decreaseProcessCount = (count) => Math.max(0, (Number(count) || 0) - 1)
+
 const appendInsightLog = (history, message) => {
   const normalizedMessage = toNormalizedName(message)
   if (!normalizedMessage) {
@@ -61,11 +64,19 @@ export const useBehaviorStore = create(
       cookedRecipes: [],
       wastedIngredients: [],
       insightByTrigger: createEmptyInsightState(),
+      activeAgentProcessCount: 0,
 
-      // Agent log state (not persisted — UI only)
-      currentAgentLog: '',
-      setAgentLog: (message) => set({ currentAgentLog: message }),
-      clearAgentLog: () => set({ currentAgentLog: '' }),
+      startAgentProcess: () =>
+        set((state) => ({
+          activeAgentProcessCount: increaseProcessCount(state.activeAgentProcessCount),
+        })),
+
+      finishAgentProcess: () =>
+        set((state) => ({
+          activeAgentProcessCount: decreaseProcessCount(state.activeAgentProcessCount),
+        })),
+
+      resetAgentProcess: () => set({ activeAgentProcessCount: 0 }),
 
       beginInsightStream: (trigger, requestKey) =>
         set((state) => {
@@ -89,7 +100,7 @@ export const useBehaviorStore = create(
           }
 
           return {
-            currentAgentLog: '',
+            activeAgentProcessCount: increaseProcessCount(state.activeAgentProcessCount),
             insightByTrigger: {
               ...state.insightByTrigger,
               [safeTrigger]: {
@@ -119,7 +130,6 @@ export const useBehaviorStore = create(
           const nextLogHistory = appendInsightLog(currentInsight.logHistory, normalizedMessage)
 
           return {
-            currentAgentLog: normalizedMessage,
             insightByTrigger: {
               ...state.insightByTrigger,
               [safeTrigger]: {
@@ -151,7 +161,12 @@ export const useBehaviorStore = create(
             return state
           }
 
+          const wasLoading = currentInsight.loading === true
+
           return {
+            activeAgentProcessCount: wasLoading
+              ? decreaseProcessCount(state.activeAgentProcessCount)
+              : state.activeAgentProcessCount,
             insightByTrigger: {
               ...state.insightByTrigger,
               [safeTrigger]: {
@@ -184,7 +199,12 @@ export const useBehaviorStore = create(
             return state
           }
 
+          const wasLoading = currentInsight.loading === true
+
           return {
+            activeAgentProcessCount: wasLoading
+              ? decreaseProcessCount(state.activeAgentProcessCount)
+              : state.activeAgentProcessCount,
             insightByTrigger: {
               ...state.insightByTrigger,
               [safeTrigger]: {
@@ -200,7 +220,13 @@ export const useBehaviorStore = create(
       clearInsight: (trigger) =>
         set((state) => {
           const safeTrigger = normalizeInsightTrigger(trigger)
+          const currentInsight = state.insightByTrigger?.[safeTrigger]
+          const shouldDecrease = currentInsight?.loading === true
+
           return {
+            activeAgentProcessCount: shouldDecrease
+              ? decreaseProcessCount(state.activeAgentProcessCount)
+              : state.activeAgentProcessCount,
             insightByTrigger: {
               ...state.insightByTrigger,
               [safeTrigger]: {

@@ -43,6 +43,20 @@ const normalizePortionSize = (value) => {
   return Math.min(12, Math.max(1, Math.round(parsed)))
 }
 
+const normalizePortionCost = (value) => {
+  const raw = String(value ?? '').trim().replaceAll(',', '.')
+  if (!raw) {
+    return 0
+  }
+
+  const numeric = Number(raw.replaceAll(/[^\d.-]/g, ''))
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 0
+  }
+
+  return Number(numeric.toFixed(2))
+}
+
 const normalizeIngredient = (ingredient) => ({
   isim: String(ingredient?.isim ?? ingredient?.name ?? '').trim(),
   miktar: String(ingredient?.miktar ?? ingredient?.baseAmount ?? '1').trim() || '1',
@@ -78,6 +92,9 @@ const normalizeRecipe = (recipe) => ({
   pisirmeAdimlari: (Array.isArray(recipe?.pisirmeAdimlari) ? recipe.pisirmeAdimlari : recipe?.adimlar || [])
     .map((step) => String(step ?? '').trim())
     .filter(Boolean),
+  porsiyonMaliyetiTl: normalizePortionCost(
+    recipe?.porsiyonMaliyetiTl ?? recipe?.portionCost ?? recipe?.plateCost,
+  ),
 })
 
 const normalizePlannedMeal = (plannedMeal) => {

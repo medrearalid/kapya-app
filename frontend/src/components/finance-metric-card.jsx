@@ -4,22 +4,22 @@ import AnimatedCurrency from './animated-currency'
 
 const toneStyles = {
   neutral: {
-    card: 'border-slate-200/70 bg-gradient-to-br from-slate-50/80 via-white/85 to-slate-100/65 dark:border-slate-700/60 dark:from-slate-900/70 dark:via-slate-900/70 dark:to-slate-800/70',
-    badge: 'bg-white/80 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200',
-    value: 'text-slate-900 dark:text-slate-100',
-    subtitle: 'text-slate-600 dark:text-slate-300',
+    card: 'border-black/10 bg-white dark:border-slate-700/60 dark:bg-slate-900/80',
+    badge: 'bg-[#f4f1ee] text-[#4b4b4b] dark:bg-slate-800/70 dark:text-slate-200',
+    value: 'text-[#050505] dark:text-slate-100',
+    subtitle: 'text-[#4b4b4b] dark:text-slate-300',
   },
   spend: {
-    card: 'border-sand-100/90 bg-gradient-to-br from-sand-50/90 via-white/85 to-slate-100/80 dark:border-slate-700/60 dark:from-slate-900/70 dark:via-slate-900/70 dark:to-slate-800/70',
-    badge: 'bg-white/80 text-sand-700 dark:bg-slate-800/70 dark:text-slate-200',
-    value: 'text-sand-900 dark:text-slate-100',
-    subtitle: 'text-sand-700/80 dark:text-slate-300',
+    card: 'border-black/10 bg-[#f7f4f0] dark:border-slate-700/60 dark:bg-slate-900/80',
+    badge: 'bg-white text-[#4b4b4b] dark:bg-slate-800/70 dark:text-slate-200',
+    value: 'text-[#171717] dark:text-slate-100',
+    subtitle: 'text-[#4b4b4b] dark:text-slate-300',
   },
   saved: {
-    card: 'border-emerald-200/75 bg-gradient-to-br from-emerald-50/85 via-white/80 to-emerald-100/75 shadow-[0_24px_42px_rgba(16,185,129,0.18)] dark:border-emerald-800/45 dark:from-emerald-950/45 dark:via-slate-900/70 dark:to-emerald-900/40',
-    badge: 'bg-white/80 text-emerald-700 dark:bg-slate-800/70 dark:text-emerald-200',
-    value: 'text-emerald-800 dark:text-emerald-100',
-    subtitle: 'text-emerald-700/85 dark:text-emerald-200/85',
+    card: 'border-black/10 bg-[#ece7e2] dark:border-slate-700/60 dark:bg-slate-900/80',
+    badge: 'bg-white text-[#171717] dark:bg-slate-800/70 dark:text-slate-200',
+    value: 'text-[#171717] dark:text-slate-100',
+    subtitle: 'text-[#4b4b4b] dark:text-slate-300',
   },
 }
 
@@ -40,14 +40,14 @@ function FinanceMetricCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut', delay }}
       className={[
-        'glass-panel rounded-3xl border p-5 sm:p-6',
+        'feature-card rounded-3xl border p-5 sm:p-6',
         style.card,
         className,
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#4b4b4b] dark:text-slate-400">
             {title}
           </p>
           <p className={`mt-2 text-[11px] font-medium ${style.subtitle}`}>{subtitle}</p>

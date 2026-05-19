@@ -1,126 +1,119 @@
 import { CalendarDays, ChefHat, House, Settings2, Wallet } from 'lucide-react'
-import { motion } from 'framer-motion'
 import PropTypes from 'prop-types'
 import { useTranslation } from 'react-i18next'
-import { NavLink } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { MenuBar } from './ui/glow-menu'
+import { useMemo } from 'react'
 
 const navItems = [
   {
     to: '/',
     labelKey: 'navigation.pantry',
-    Icon: House,
+    icon: House,
+    gradient: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(37,99,235,0.06) 50%, rgba(29,78,216,0) 100%)',
+    iconColor: 'text-blue-500',
     exact: true,
   },
   {
     to: '/recipes',
     labelKey: 'navigation.recipes',
-    Icon: ChefHat,
+    icon: ChefHat,
+    gradient: 'radial-gradient(circle, rgba(249,115,22,0.15) 0%, rgba(234,88,12,0.06) 50%, rgba(194,65,12,0) 100%)',
+    iconColor: 'text-orange-500',
     exact: false,
   },
   {
     to: '/planner',
     labelKey: 'navigation.planner',
-    Icon: CalendarDays,
-    exact: false,
-  },
-  {
-    to: '/settings',
-    labelKey: 'navigation.settings',
-    Icon: Settings2,
+    icon: CalendarDays,
+    gradient: 'radial-gradient(circle, rgba(34,197,94,0.15) 0%, rgba(22,163,74,0.06) 50%, rgba(21,128,61,0) 100%)',
+    iconColor: 'text-green-500',
     exact: false,
   },
   {
     to: '/wallet',
     labelKey: 'navigation.wallet',
-    Icon: Wallet,
+    icon: Wallet,
+    gradient: 'radial-gradient(circle, rgba(168,85,247,0.15) 0%, rgba(147,51,234,0.06) 50%, rgba(126,34,206,0) 100%)',
+    iconColor: 'text-purple-500',
+    exact: false,
+  },
+  {
+    to: '/settings',
+    labelKey: 'navigation.settings',
+    icon: Settings2,
+    gradient: 'radial-gradient(circle, rgba(239,68,68,0.15) 0%, rgba(220,38,38,0.06) 50%, rgba(185,28,28,0) 100%)',
+    iconColor: 'text-red-500',
     exact: false,
   },
 ]
 
-function BottomNavigation() {
-  const { t } = useTranslation()
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-6 sm:pb-4 md:hidden">
-      <div className="glass-panel mx-auto w-full rounded-2xl border border-white/55 p-2 shadow-soft dark:border-slate-700/50">
-        <div className="flex items-center gap-2">
-          <ul className="grid flex-1 grid-cols-5 gap-2">
-            {navItems.map(({ to, labelKey, Icon, exact }) => (
-              <li key={to}>
-                <NavLink
-                  to={to}
-                  end={exact}
-                  className={({ isActive }) =>
-                    [
-                      'flex flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold transition',
-                      isActive
-                        ? 'bg-kapya-500 text-white shadow-soft'
-                        : 'text-sand-700 hover:bg-white/55 hover:text-sand-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-slate-100',
-                    ].join(' ')
-                  }
-                >
-                  <motion.span whileTap={{ scale: 0.95 }} className="flex flex-col items-center">
-                    <Icon className="mb-1 h-4 w-4" aria-hidden="true" />
-                    <span>{t(labelKey)}</span>
-                  </motion.span>
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </nav>
-  )
-}
-
-function SidebarNavigation() {
-  const { t } = useTranslation()
-
-  return (
-    <nav className="hidden h-full md:block">
-      <div className="glass-panel flex h-full w-full flex-col rounded-3xl border border-white/55 p-3 shadow-soft dark:border-slate-700/50">
-        <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-          Kapya
-        </p>
-
-        <ul className="space-y-2">
-            {navItems.map(({ to, labelKey, Icon, exact }) => (
-              <li key={to}>
-                <NavLink
-                  to={to}
-                  end={exact}
-                  className={({ isActive }) =>
-                    [
-                      'inline-flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
-                      isActive
-                        ? 'bg-kapya-500 text-white shadow-soft'
-                        : 'text-sand-700 hover:bg-white/55 hover:text-sand-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-slate-100',
-                    ].join(' ')
-                  }
-                >
-                  <motion.span whileTap={{ scale: 0.97 }} className="inline-flex items-center gap-2">
-                    <Icon className="h-4 w-4" aria-hidden="true" />
-                    <span>{t(labelKey)}</span>
-                  </motion.span>
-                </NavLink>
-              </li>
-            ))}
-        </ul>
-      </div>
-    </nav>
-  )
-}
-
 function Navigation({ variant }) {
-  return variant === 'sidebar' ? <SidebarNavigation /> : <BottomNavigation />
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const menuItems = useMemo(() => {
+    return navItems.map((item) => ({
+      icon: item.icon,
+      label: t(item.labelKey),
+      href: item.to,
+      gradient: item.gradient,
+      iconColor: item.iconColor,
+      rawPath: item.to,
+      exact: item.exact,
+    }))
+  }, [t])
+
+  const activeItem = useMemo(() => {
+    const currentPath = location.pathname
+    // First try exact match
+    const exactMatch = menuItems.find((item) => currentPath === item.rawPath)
+    if (exactMatch) return exactMatch.label
+    
+    // Then try prefix match (for nested routes like /recipes/123)
+    const prefixMatch = menuItems.find((item) => !item.exact && currentPath.startsWith(item.rawPath))
+    return prefixMatch ? prefixMatch.label : ''
+  }, [location.pathname, menuItems])
+
+  const handleItemClick = (label) => {
+    const item = menuItems.find((i) => i.label === label)
+    if (item) {
+      navigate(item.rawPath)
+    }
+  }
+
+  if (variant === 'bottom') {
+    return (
+      <div className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-6 sm:pb-4 md:hidden">
+        <MenuBar
+          items={menuItems}
+          activeItem={activeItem}
+          onItemClick={handleItemClick}
+          className="mx-auto w-full no-scrollbar overflow-x-auto bg-white/92 dark:bg-slate-900/90"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="sticky top-3 z-40 w-full">
+      <MenuBar
+        items={menuItems}
+        activeItem={activeItem}
+        onItemClick={handleItemClick}
+        className="w-full bg-white/90 dark:bg-slate-900/88"
+      />
+    </div>
+  )
 }
 
 Navigation.propTypes = {
-  variant: PropTypes.oneOf(['bottom', 'sidebar']),
+  variant: PropTypes.oneOf(['top', 'bottom']),
 }
 
 Navigation.defaultProps = {
-  variant: 'bottom',
+  variant: 'top',
 }
 
-export default Navigation
+export default Navigation

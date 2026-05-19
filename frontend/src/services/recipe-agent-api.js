@@ -26,11 +26,14 @@ const toGuidedContextPayload = (guidedContext) => {
     return null
   }
 
+  const cookingTechnique = String(guidedContext?.cookingTechnique ?? '').trim()
+  const dietGoal = String(guidedContext?.dietGoal ?? '').trim()
+
   return {
     category: String(guidedContext?.category ?? '').trim(),
     focusIngredients: toCleanStringArray(guidedContext?.focusIngredients),
-    cookingTechnique: String(guidedContext?.cookingTechnique ?? '').trim(),
-    dietGoal: String(guidedContext?.dietGoal ?? '').trim(),
+    cookingTechnique: cookingTechnique === 'fark_etmez' ? '' : cookingTechnique,
+    dietGoal: dietGoal === 'fark_etmez' ? '' : dietGoal,
   }
 }
 
@@ -87,6 +90,7 @@ export const generateRecipeByName = async ({
   isLucky,
   mealType,
   recentRecipeNames,
+  portionSize,
 }) => {
   const payload = {
     mealName: String(mealName ?? '').trim(),
@@ -95,6 +99,10 @@ export const generateRecipeByName = async ({
   setArrayFieldIfAny(payload, 'pantryStock', pantryStock)
   setArrayFieldIfAny(payload, 'focusedIngredients', focusedIngredients)
   setArrayFieldIfAny(payload, 'preferences', preferences)
+
+  if (portionSize) {
+    payload.portionSize = portionSize
+  }
 
   const normalizedGuidedContext = toGuidedContextPayload(guidedContext)
   if (normalizedGuidedContext) {

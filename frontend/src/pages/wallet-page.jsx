@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
-import { PiggyBank, TrendingUp, Wallet } from 'lucide-react'
+import { PiggyBank, TrendingUp, Wallet, WalletCards } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import AnimatedCurrency from '../components/animated-currency'
+import EmptyStatePanel from '../components/empty-state-panel'
 import FinanceMetricCard from '../components/finance-metric-card'
 import FinanceInsightCard from '../components/finance-insight-card'
 import { useFinanceStore } from '../store/finance-store'
@@ -77,16 +78,32 @@ function WalletPage() {
     [currentMonthPreventedWaste, currentMonthSpend],
   )
 
+  const hasWalletData = useMemo(
+    () =>
+      pantryProducts.length > 0 ||
+      totalInventoryCost > 0 ||
+      totalConsumedCost > 0 ||
+      currentMonthSpend > 0 ||
+      currentMonthPreventedWaste > 0,
+    [
+      currentMonthPreventedWaste,
+      currentMonthSpend,
+      pantryProducts.length,
+      totalConsumedCost,
+      totalInventoryCost,
+    ],
+  )
+
   return (
-    <section className="space-y-5 pb-20 md:pb-6">
+    <section className="space-y-6 pb-20 md:pb-6">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sand-700 dark:text-slate-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#4b4b4b] dark:text-slate-400">
           {t('wallet.badge')}
         </p>
-        <h1 className="heading-display mt-2 text-3xl font-semibold text-sand-900 dark:text-slate-100">
+        <h1 className="heading-display mt-2 text-3xl font-semibold text-[#050505] dark:text-slate-100">
           {t('wallet.title')}
         </h1>
-        <p className="mt-2 max-w-xl text-sm text-slate-600 dark:text-slate-300">
+        <p className="mt-2 max-w-xl text-sm text-[#4b4b4b] dark:text-slate-300">
           {t('wallet.subtitle')}
         </p>
       </header>
@@ -125,42 +142,74 @@ function WalletPage() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut', delay: 0.14 }}
-          className="glass-panel rounded-3xl border border-slate-200/70 bg-gradient-to-br from-white/85 via-slate-50/85 to-slate-100/70 p-5 dark:border-slate-700/55 dark:from-slate-900/75 dark:via-slate-900/70 dark:to-slate-800/65 md:col-span-7"
+          className="feature-card rounded-3xl border border-black/10 bg-white p-5 dark:border-slate-700/55 dark:bg-slate-900/75 md:col-span-7"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-            {t('wallet.monthlyPanelTitle')}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#4b4b4b] dark:text-slate-400">
+              {t('wallet.monthlyPanelTitle')}
+            </p>
+            <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-full">
+              ▼ 12.4% geçen aya göre
+            </div>
+          </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white/65 p-3.5 dark:bg-slate-800/65">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="rounded-2xl bg-[#f7f4f0] p-3.5 dark:bg-slate-800/65">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#737373] dark:text-slate-400">
                 {t('wallet.monthlySpendTitle')}
               </p>
               <AnimatedCurrency
                 value={currentMonthSpend}
-                className="mt-2 block text-2xl font-semibold text-slate-900 dark:text-slate-100"
+                className="mt-2 block text-2xl font-semibold text-[#050505] dark:text-slate-100"
               />
             </div>
 
-            <div className="rounded-2xl bg-emerald-50/70 p-3.5 dark:bg-emerald-900/30">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+            <div className="rounded-2xl bg-[#ece7e2] p-3.5 dark:bg-slate-800/65">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4b4b4b] dark:text-slate-300">
                 {t('wallet.monthlySavedTitle')}
               </p>
               <AnimatedCurrency
                 value={currentMonthPreventedWaste}
-                className="mt-2 block text-2xl font-semibold text-emerald-800 dark:text-emerald-100"
+                className="mt-2 block text-2xl font-semibold text-[#171717] dark:text-slate-100"
               />
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/65 px-3.5 py-3 dark:border-slate-700/60 dark:bg-slate-800/65">
-            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-              {t('wallet.netPressureTitle')}
-            </span>
-            <AnimatedCurrency
-              value={netKitchenPressure}
-              className="text-xl font-semibold text-slate-900 dark:text-slate-100"
-            />
+          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-black/10 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-800/65">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#737373] dark:text-slate-400">
+                {t('wallet.netPressureTitle')}
+              </span>
+              <AnimatedCurrency
+                value={netKitchenPressure}
+                className="text-xl font-bold text-[#050505] dark:text-slate-100"
+              />
+            </div>
+            
+            <div className="relative h-2 rounded-full bg-slate-100 dark:bg-slate-700/50 mt-1">
+              <motion.div
+                className="absolute h-2 rounded-full bg-[#050505] dark:bg-slate-300"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((netKitchenPressure / 3000) * 100, 100)}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              />
+              <motion.div
+                className="absolute h-3 -translate-y-1/2 top-1/2 rounded-full"
+                style={{
+                  left: `50%`,
+                  width: '2px',
+                  backgroundColor: 'var(--emerald-500, #10b981)',
+                }}
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ duration: 0.5, delay: 0.8 }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-[#737373] dark:text-slate-400 font-medium">
+              <span>0 ₺</span>
+              <span>Benchmark (1.500 ₺)</span>
+              <span>3.000+ ₺</span>
+            </div>
           </div>
         </motion.article>
 
@@ -168,34 +217,67 @@ function WalletPage() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut', delay: 0.18 }}
-          className="glass-panel rounded-3xl border border-emerald-200/65 bg-gradient-to-br from-emerald-50/80 via-white/85 to-sage-100/70 p-5 dark:border-emerald-800/50 dark:from-emerald-950/40 dark:via-slate-900/70 dark:to-sage-900/35 md:col-span-5"
+          className="feature-card rounded-3xl border border-black/10 bg-white p-5 dark:border-slate-700/60 dark:bg-slate-900/80 md:col-span-5 flex flex-col justify-between"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
-            {t('wallet.modelTitle')}
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-emerald-900/90 dark:text-emerald-100/90">
-            {t('wallet.modelDescription')}
-          </p>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#4b4b4b] dark:text-slate-300">
+              {t('wallet.modelTitle')}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-[#4b4b4b] dark:text-slate-200">
+              {t('wallet.modelDescription')}
+            </p>
+          </div>
 
-          <div className="mt-4 space-y-2 rounded-2xl bg-white/65 p-3.5 dark:bg-slate-800/65">
-            <div className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-200">
+          <div className="mt-4 space-y-4 rounded-2xl bg-[#f7f4f0] p-4 dark:bg-slate-800/65">
+            <div className="flex items-center justify-between text-sm font-medium text-[#4b4b4b] dark:text-slate-200">
               <span>{t('wallet.multiplierLabel')}</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+              <span className="font-semibold text-[#171717] dark:text-slate-100">
                 {formatMultiplier(wastePreventionMultiplier)}
               </span>
             </div>
-            <div className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-200">
-              <span>{t('wallet.coverageRatioLabel')}</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                %{wasteCoverageRatio.toFixed(0)}
-              </span>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm font-medium text-[#4b4b4b] dark:text-slate-200">
+                <span>{t('wallet.coverageRatioLabel')}</span>
+                <span className="font-bold text-lg text-[#171717] dark:text-slate-100">
+                  %{wasteCoverageRatio.toFixed(0)}
+                </span>
+              </div>
+              
+              <div className="relative flex w-full h-2 rounded-full overflow-hidden mt-1">
+                <div className="bg-red-400/80" style={{ width: '25%' }} />
+                <div className="bg-orange-400/80" style={{ width: '25%' }} />
+                <div className="bg-emerald-500/80" style={{ width: '50%' }} />
+                
+                <motion.div
+                  className="absolute w-1.5 h-3 bg-black dark:bg-white rounded-full -translate-y-1/2 top-1/2 shadow-sm"
+                  initial={{ left: 0 }}
+                  animate={{ left: `calc(${Math.min(wasteCoverageRatio, 100)}% - 3px)` }}
+                  transition={{ duration: 1, ease: "easeOut" }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-medium pt-1 opacity-70">
+                <span>Kritik</span>
+                <span>İdeal</span>
+                <span>Mükemmel</span>
+              </div>
             </div>
           </div>
         </motion.article>
 
         <div className="md:col-span-12">
-          <FinanceInsightCard pantryProducts={pantryProducts} financeData={financeData} />
+          {hasWalletData ? (
+            <FinanceInsightCard pantryProducts={pantryProducts} financeData={financeData} />
+          ) : (
+            <EmptyStatePanel
+              icon={WalletCards}
+              title={t('wallet.emptyStateTitle')}
+              description={t('wallet.emptyStateDescription')}
+            />
+          )}
         </div>
+        
+
       </div>
     </section>
   )

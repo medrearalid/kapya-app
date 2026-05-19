@@ -485,7 +485,7 @@ export const analyzeReceiptImage = async ({ imageBase64 }) => {
     'Gida disi urunleri ASLA ekleme (ornek: bardak, tabak, mutfak esyasi, temizlik urunu).',
     'Emin degilsen urunu hic ekleme.',
     'Her urun icin su alanlari dondur: name, quantity, unit, price, estimatedShelfLifeDays, kategori.',
-    'KURAL 1 - URUN ADI: Fisteki tum kisaltmalari ve kodlari duzelterek temiz Turkce ile Türkçe karakter kullanarak yaz; sadece ilk harfi buyuk olsun (Ornek: "DMT 1KG"->"Domates", "YMR"->"Yumurta", "ZYT YAG 0.75L"->"Zeytinyagi").',
+    'KURAL 1 - URUN ADI: Marka adlarını (örneğin: Sütaş, Pınar, Ülker vb.), ağırlık/hacim bildiren ifadeleri ve gereksiz kısaltmaları TAMAMEN ÇIKAR. Yalnızca yiyeceğin en temel, jenerik adını (örneğin "Sütaş Tam Yağlı Süt" yerine sadece "Süt", "DMT 1KG" yerine "Domates") temiz Türkçe ve düzgün Türkçe karakterler kullanarak yaz. Sadece ilk harfi büyük olsun.',
     'KURAL 2 - BIRIM: Stoktan düşme hesabını doğru yapabilmek için; hassas birimler kullan (Ornek: 1.5 kg->1500 gram). Kabul edilen birimler: adet, gram, paket, litre, mevcut.',
     'KURAL 3 - BAHARAT: Baharat turundeki her urun (tuz, karabiber, kimyon, pul biber vs.) icin quantity=1 ve unit="var" kullan.',
     'KURAL 4 - KATEGORI: Her urune su kategorilerden birini ata: Sebzeler, Meyveler, Et ve Tavuk, Sut Urunleri, Baharatlar, Atistirmaliklar, Temel Gida, Diger.',

@@ -128,6 +128,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
     const dishCategory = String(request.body?.dishCategory ?? '').trim().toLowerCase()
     const recentRecipeNames = request.body?.recentRecipeNames
     const guidedContext = request.body?.guidedContext
+    const portionSize = request.body?.portionSize
 
     const validationError = validateByNameRequest({
       pantryStock,
@@ -169,6 +170,7 @@ export const postGenerateRecipeByName = async (request, response, next) => {
       dishCategory,
       recentRecipeNames,
       guidedContext,
+      portionSize,
     })
 
     return response.status(200).json({

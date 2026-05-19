@@ -31,7 +31,7 @@ function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
       onDragEnd={handleDragEnd}
       animate={swipeControls}
       className={[
-        'rounded-xl border border-slate-100 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-800/60',
+        'rounded-[20px] border border-black/10 bg-white p-3 shadow-soft dark:border-slate-700 dark:bg-slate-800/60',
         meal.completed ? 'opacity-70' : '',
       ].join(' ')}
     >
@@ -42,16 +42,16 @@ function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
           className="h-14 w-14 rounded-xl object-cover"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <p className="truncate text-sm font-semibold text-[#050505] dark:text-slate-100">
             {meal?.recipe?.tarifAdi}
           </p>
-          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          <p className="mt-1 text-xs text-[#4b4b4b] dark:text-slate-300">
             {t('planner.portionInfo', { count: meal.portionSize })}
           </p>
         </div>
       </TapButton>
 
-      <p className="mt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+      <p className="mt-2 text-[11px] font-medium text-[#737373] dark:text-slate-400">
         {t('planner.swipeHint')}
       </p>
 
@@ -62,7 +62,7 @@ function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
           disabled={meal.completed}
           className={[
             'inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-white',
-            meal.completed ? 'bg-emerald-400/80' : 'bg-emerald-600 hover:bg-emerald-700',
+            meal.completed ? 'bg-[#4b4b4b]/75' : 'bg-[#171717] hover:bg-black',
           ].join(' ')}
         >
           {meal.completed ? (
@@ -81,7 +81,7 @@ function PlannedMealCard({ meal, onOpenDetail, onCookMeal, onRemoveMeal }) {
         <TapButton
           type="button"
           onClick={() => onRemoveMeal(meal.id)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          className="soft-highlight-btn inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           {t('planner.removeButton')}

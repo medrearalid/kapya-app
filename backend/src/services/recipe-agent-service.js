@@ -70,7 +70,7 @@ const buildPrompt = ({ budgetProfile, pantryStock, urgentProducts }) => {
     '7) BAGIMSIZ DEGISKEN VE IKAME: Bir tarif sivi yag gerektiriyorsa ve dolabimizda zeytinyagi veya tereyagi varsa, o malzemeyi eksik sayma; dolapta olanla ikame et. Benzer sekilde limon suyu-limon gibi mantikli ikameler uygula.',
     '8) ONCELIK SIRASI: Her seyden once SADECE dolaptaki malzemelerle yapilabilecek (eksik=0) tarifleri bul ve oner. Dolap cok bossa ve hic secenegin yoksa maksimum 1-2 eksik malzemeli tarifler ekle; fazlasini asla ekleme.',
     '9) JSON semasi disinda hicbir metin, markdown veya aciklama dondurme.',
-    '10) Tariflerin isimlendirmesini kısa ve öz yap.',
+    '10) TARIF ADLANDIRMA: Tarif isimleri (tarifAdi) kesinlikle yapay, suslu, soyut veya edebi olmamalidir (ornek: "Tava Surprizi", "Sebze Ruyasi", "Lezzet Senligi" KESINLIKLE YASAKTIR). Tarif isimleri yemeğin kendisini en net, en sade ve en geleneksel sekilde yansitmali, dogrudan Turk mutfagindaki bilinen adlari olmalidir (ornek: "Omlet", "Sucuklu Yumurta", "Makarna", "Pirinc Pilavi", "Kuru Fasulye", "Menemen", "Mercimek Corbasi", "Irmik Helvasi", "Tavuk Sote", "Izmir Kofte").',
     '',
     `Girdi verisi: ${JSON.stringify(payload)}`,
   ].join('\n')
