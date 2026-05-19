@@ -7,7 +7,7 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '')
   const apiProxyTarget = String(
-    env.VITE_API_BASE_URL || env.VITE_API_PROXY_TARGET || 'http://localhost:5000',
+    env.VITE_API_BASE_URL || env.VITE_API_PROXY_TARGET || 'https://kapya-app.onrender.com',
   ).replace(/\/$/, '')
 
   return {

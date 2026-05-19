@@ -133,7 +133,7 @@ NANO_BANANA_API_KEY=
 ### frontend/.env
 
 ```env
-VITE_API_BASE_URL=http://localhost:3001
+VITE_API_BASE_URL=https://kapya-app.onrender.com
 ```
 
 ## Geliştirme Modunda Çalıştırma
