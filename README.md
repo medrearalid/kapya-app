@@ -4,6 +4,7 @@
 
 🔗 **Canlı Demo:** [kapya-app.netlify.app](https://kapya-app.netlify.app/)
 
+> ⚠️ **Jüri ve İnceleyenler İçin Önemli Not (Cold Start):** > Canlı demoyu test ederken, yapay zekayı tetikleyen ilk işleminiz (örneğin ilk tarif üretimi veya ilk fiş analizi) **30-35 saniye** kadar sürebilir. Bu durum bir hata değil; backend sunucumuzun (Render) maliyet optimizasyonu sebebiyle kullanılmadığı anlarda uyku moduna geçmesinden (Cold Start) kaynaklanmaktadır. İlk istekle birlikte sunucu uyandığında, yapacağınız diğer tüm işlemler ve Kolektif Önbellek (Redis) yanıtları **milisaniyeler içinde** gerçekleşecektir.
 ---
 
 ## 📱 Ekran Görüntüleri (Screenshots)
