@@ -147,6 +147,10 @@ const getRedisClient = () => {
   const token = String(process.env.UPSTASH_REDIS_REST_TOKEN ?? '').trim()
 
   if (!url || !token) {
+    console.warn(
+      '[semantic-cache] Redis kimlik bilgileri eksik, önbellek devre dışı bırakıldı - doğrudan LLM\'e gidiliyor. ' +
+        'UPSTASH_REDIS_REST_URL ve UPSTASH_REDIS_REST_TOKEN ortam değişkenlerini tanımlayın.',
+    )
     cachedRedisClient = null
     return cachedRedisClient
   }
