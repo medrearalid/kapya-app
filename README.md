@@ -1,6 +1,52 @@
-# Kapya
+# 🌶️ Kapya - Akıllı Mutfak ve Finans Asistanı
 
-Kapya; mutfak stok yönetimi, yemek planlama ve yapay zeka destekli tarif üretimini tek bir mobil öncelikli (Mobile-First) deneyimde birleştiren bir web uygulamasıdır. Proje, gıda israfını en aza indirmeyi hedefler ve kullanıcının dolabındaki mevcut ürünleri merkeze alarak pratik ve bütçeye uygun yemek önerileri sunar.
+> **BTK Akademi Hackathon 2026 Projesi** > Mutfak enflasyonuyla savaşan, israfı önleyen ve yapay zeka ajanlarıyla mutfağınızı finansal bir dashboard'a dönüştüren yeni nesil FoodTech & FinTech platformu.
+
+🔗 **Canlı Demo:** [kapya-app.netlify.app](https://kapya-app.netlify.app/)
+
+---
+
+## 📱 Ekran Görüntüleri (Screenshots)
+
+| 🏡 Ana Sayfa & Mutfak Stoğu | 🍳 Şef Sekmesi (AI Agent) | 💳 Cüzdan (Bento Financial Dashboard) |
+| :---: | :---: | :---: |
+| ![Ana Sayfa](x) | ![Şef Sekmesi](x) | ![Cüzdan Sekmesi](x) |
+| *Gelişmiş Mutfak Envanteri ve Ürün Yönetimi* | *Agent Plan Loader UI ile Sıfır İsraf Odaklı Tarif Motoru* | *Kurtarılan İsraf ve Anlık Enflasyon Metrikleri* |
+
+
+---
+
+## 🌟 Öne Çıkan Özellikler
+
+### 🎨 "Warm Canvas" Elit Tasarım Sistemi
+Sıradan karanlık temaların veya boğucu aydınlık arayüzlerin ötesinde; şık krem, kum ve derin mürekkep tonlarıyla (`bg-canvas-sand`, `text-midnight-ink`) tasarlanmış, entelektüel ve premium bir SaaS arayüzü (Linear & Notion estetiği).
+
+### 🤖 Akıllı Şef Motoru & "Agent Plan Loader"
+Yapılan API isteklerinde kullanıcının sıkılmasını engellemek amacıyla arka plandaki LLM zincirinin adım adım ne düşündüğünü gösteren Framer Motion destekli dinamik yükleme arayüzü. 
+* *Adım 1: Mutfak Envanteri Analiz Ediliyor...*
+* *Adım 2: Maliyet ve Bütçe Hesaplanıyor...*
+* *Adım 3: Sıfır İsraf Hedefli Tarif Üretiliyor...*
+
+### 📊 Bento Box Stili Finansal Veri Paneli
+Cüzdan sekmesinde mutfak harcamalarını, tüketilen tabak maliyetlerini ve otonom olarak hesaplanan **"Kurtarılan İsraf" (Prevented Waste)** metriklerini tek bir ekranda agregasyon motoruyla birleştiren modern grid yapısı.
+
+### ⚡ Kolektif Önbellek (Semantic Cache) Mimarisi
+Aynı malzeme kombinasyonuyla üretilen tarifleri **Upstash Serverless Redis** üzerinde global bir havuzda saklar. Aynı sorguyu atan farklı kullanıcılar LLM'e gitmeden milisaniyeler içinde ve sıfır API maliyetiyle cevaba ulaşır.
+
+### 🌐 Tam PWA (Progressive Web App) Desteği
+Vite PWA manifestosu entegrasyonu sayesinde uygulama mobil cihazlara ve masaüstüne yerel bir uygulama (standalone) gibi kurulabilir.
+
+---
+
+## 🛠️ Teknoloji Yığını (Tech Stack)
+
+### Mimari Yapı
+Uygulama, frontend ve backend katmanlarının tamamen izole edildiği modern bir **Monorepo** yapısına sahiptir.
+
+* **Frontend (Netlify):** React, TypeScript, Vite, Tailwind CSS, Framer Motion, Swiper 3D Coverflow, Zustand (State Management), Lucide Icons, Shadcn/ui.
+* **Backend (Render):** Node.js, Express.js, Google Gemini Pro API (Zod ile Strict JSON Schema validation), Upstash Serverless Redis (Önbellek Katmanı), CORS.
+
+---
 
 ## Neden Kapya?
 
